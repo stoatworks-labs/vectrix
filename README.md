@@ -176,6 +176,10 @@ this runs inside someone else's host. It exists for the one failure that actuall
 happens — a shader that will not compile, which otherwise looks like "the effect
 does nothing" with no message anywhere. `~/Library/Logs/vectrix/` on macOS.
 
+<!-- attributions:start -->
+This project is built on other people's work — see [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+<!-- attributions:end -->
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE) and [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
