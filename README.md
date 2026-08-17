@@ -126,6 +126,13 @@ from a **preset** — each one is a whole machine rather than a set of slider
 positions, so turning one knob on it does something you can predict — and go from
 there.
 
+## Watch it
+
+[**Vectrix — an oscillator, a pedalboard and an oscilloscope**](https://www.youtube.com/watch?v=CmmhEgHyGzg)
+(55 seconds). Every frame is the real plugin: an FFGL plugin has no window, so
+the footage is rendered by the plugin's own offline harness rather than screen
+recorded, from the same class Resolume loads.
+
 ## Trying it
 
 A browser demo runs at
