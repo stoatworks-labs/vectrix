@@ -242,9 +242,19 @@ install(TARGETS VectrixSource VectrixEffect
 if(BUILD_OFX)
     set(OFX_SDK "${CMAKE_CURRENT_SOURCE_DIR}/external/openfx")
 
+    # NOTE: `vectrix_core` is LINKED below, not spliced in here as
+    # `$<TARGET_OBJECTS:vectrix_core>`.
+    #
+    # TARGET_OBJECTS pulls in the compiled objects and nothing else -- no include
+    # directories, no compile definitions, none of the usage requirements the
+    # library declares. So this target compiled happily on macOS, where the SDK
+    # headers reach the system OpenGL framework, and failed on Windows with
+    # "Cannot open include file: 'GL/glew.h'" from inside FFGL.h, because GLEW
+    # arrives through `vectrix_core`'s PUBLIC link to GLEW::GLEW and that link
+    # was exactly what TARGET_OBJECTS threw away. Linking the OBJECT library
+    # gives both the objects and the usage requirements.
     add_library(VectrixOFX MODULE
         source/ofx/VectrixOFX.cpp
-        $<TARGET_OBJECTS:vectrix_core>
         ${OFX_SDK}/Support/Library/ofxsCore.cpp
         ${OFX_SDK}/Support/Library/ofxsImageEffect.cpp
         ${OFX_SDK}/Support/Library/ofxsInteract.cpp
@@ -257,15 +267,10 @@ if(BUILD_OFX)
     target_include_directories(VectrixOFX PRIVATE
         source external/dr_libs external/stb
         "${OFX_SDK}/include" "${OFX_SDK}/Support/include")
-    target_link_libraries(VectrixOFX PRIVATE ffgl::sdk)
+    target_link_libraries(VectrixOFX PRIVATE vectrix_core)
     target_compile_definitions(VectrixOFX PRIVATE
-        VECTRIX_VERSION="${PROJECT_VERSION}"
         PLUGIN_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
         PLUGIN_VERSION_MINOR=${PROJECT_VERSION_MINOR})
-    if(VECTRIX_WITH_OPUS)
-        target_link_libraries(VectrixOFX PRIVATE opusfile)
-        target_compile_definitions(VectrixOFX PRIVATE VECTRIX_WITH_OPUS=1)
-    endif()
     if(APPLE)
         target_link_libraries(VectrixOFX PRIVATE "-framework OpenGL" "-framework AppKit")
     endif()
