@@ -267,6 +267,12 @@ a control can be stone dead while everything compiles, links, loads and renders.
   it matters.
 - The Windows build compiles in CI and has never been run.
 - No performance figure comes from CI — hosted macOS runners have no GPU.
+- **The OpenFX build has been rendered and eyeballed, never opened in a real
+  host.** Resolve, Nuke and Natron have all not seen it. Its renderer is a CPU
+  mirror of the GLSL rather than the GLSL, so the two agreeing is a claim about
+  two transcriptions, not one measured fact — `--identity`-style passthrough is
+  exact there, but nothing cross-checks the CPU trace against the GPU trace
+  pixel for pixel.
 
 ---
 

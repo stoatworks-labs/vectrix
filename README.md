@@ -165,9 +165,24 @@ real footage**. Loading cleanly is not the same as looking right.
 
 ## OpenFX — Resolve, Vegas, Nuke, Natron
 
-The same code builds an OpenFX bundle. Copy `build/Vectrix.ofx.bundle` to
-`/Library/OFX/Plugins`. There is no beat sync and no audio input there — OpenFX
-has neither — so those controls sit inert.
+The same code builds an OpenFX bundle carrying both plugins. Copy
+`build/Vectrix.ofx.bundle` to `/Library/OFX/Plugins`.
+
+The signal chain is the same code — the engine is linked in, not reimplemented —
+but four things genuinely differ, and they are limitations rather than choices:
+
+- **It renders on the CPU.** OpenFX hands a plugin no GL context, so the beam,
+  the phosphor and the glass are a mirror of the GLSL rather than the GLSL. It is
+  offline-render speed, not interactive.
+- **It replays.** Vectrix is stateful — phosphor, delay lines, a reverb tank —
+  and OpenFX renders frames in whatever order it likes. So a seek, a jump or a
+  parameter edit restarts the chain and warms it up over 120 frames. A linear
+  render is exact; a reverb tail longer than that window is not.
+- **No tempo and no audio.** OpenFX has neither, so the tempo is pinned at 120
+  and the spectrum reads as silence. The LFOs still run, since they need only a
+  frame duration, so the modulation slots are live.
+- **The Trace source draws no beam**, because its edge pass needs a GPU. You get
+  the tube, the graticule and the clip on the glass, with the gun cut off.
 
 ## Diagnostics
 
