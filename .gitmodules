@@ -1,0 +1,12 @@
+[submodule "external/ffgl"]
+	path = external/ffgl
+	url = https://github.com/resolume/ffgl
+[submodule "external/ogg"]
+	path = external/ogg
+	url = https://github.com/xiph/ogg
+[submodule "external/opus"]
+	path = external/opus
+	url = https://github.com/xiph/opus
+[submodule "external/opusfile"]
+	path = external/opusfile
+	url = https://github.com/xiph/opusfile

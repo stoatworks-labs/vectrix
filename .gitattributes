@@ -1,0 +1,3 @@
+external/stb/*     linguist-vendored
+external/dr_libs/* linguist-vendored
+external/openfx/*  linguist-vendored

@@ -1,0 +1,8 @@
+{
+  "name": "vectrix",
+  "version-string": "0.1.0",
+  "description": "Dependencies for building the Vectrix FFGL plugins. GLEW is only needed on Windows; macOS uses the system OpenGL framework. Audio decoding is dr_libs and stb_vorbis (vendored under external/), plus libogg/libopus/libopusfile built from source as submodules -- deliberately not vcpkg ports, because vcpkg triplets are per-architecture and cannot produce the universal macOS binary.",
+  "dependencies": [
+    { "name": "glew", "platform": "!osx" }
+  ]
+}

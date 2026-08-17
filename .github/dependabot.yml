@@ -1,0 +1,13 @@
+# Actions only. The C++ dependencies here are git submodules pinned to exact
+# commits (the FFGL SDK, libogg/libopus/libopusfile), which Dependabot cannot
+# reason about, and the vendored single-header decoders are not a package
+# ecosystem at all.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        update-types: ["minor", "patch"]
