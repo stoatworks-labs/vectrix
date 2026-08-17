@@ -39,36 +39,54 @@ not ported.
 - **Constellation.** Sample & Hold on a P7. The strike is blue, the trail is
   yellow-green and builds *behind* the beam, and the lines between the steps come
   from the slew limiter — the beam travels rather than teleporting.
-- **Square, with Persistence up.** The corners are brighter than the sides
-  because the beam decelerates into them. The square source is deliberately not
-  arc-length parameterised; making the speed constant would delete the artefact.
+- **Square.** The corners are brighter than the sides because the beam
+  decelerates into them. The square source is deliberately not arc-length
+  parameterised; making the speed constant would delete the artefact.
 - **Fold, on anything.** The Serge wavefolder turns a circle into a rosette, and
   the bright spots in it are turnarounds.
 - **Phaser at Mix 1.0 on X only.** No notches at all, only phase shift — which
   between X and Y is a rotation of the figure. Not an affine transform, so no
   shader could produce it.
 
-## Two things that look like bugs on this page and are the plugin's
+## One thing that looks like a bug on this page and is the phosphor being right
 
-Both are reproduced rather than corrected, because a demo that quietly fixes the
-plugin's data stops being evidence about the plugin.
+**Whether a figure stands still is a race between its rate and the frame rate.**
+At 96 kHz and 60 fps a frame is 1600 samples, and the beam only gets round the
+whole figure if it is drawing it at least sixty times a second. The defaults are
+set for that — Frequency X 0.77 is about 120 Hz, so a 3:2 Lissajous closes twice
+inside a frame, and Shape Rate 0.88 is about 60 Hz, one closed loop per frame.
 
-**A figure is only drawn whole in one frame if its rate is above the frame
-rate.** At 96 kHz and 60 fps a frame is 1600 samples; at the shipped default of
-Frequency X 0.55 the oscillator runs at 8.2 Hz, so each frame contains about a
-seventh of one cycle. On a P31 at persistence ×1 nothing carries over — sixteen
-microseconds against a sixteen millisecond frame — so what you see is a comet,
-not a Lissajous. Raise Persistence, raise Frequency, or choose P7, and the figure
-appears. The same applies to Shape Rate, whose default 0.5 is 1.4 Hz against a
-`ShapeParams` struct default of 30 Hz.
+Take Frequency X well below 60 Hz and it becomes a comet instead: one frame's
+worth of route, with nothing behind it, because a P31 at persistence ×1 keeps
+nothing between frames — sixteen microseconds against a sixteen millisecond
+frame. That is not the model failing, it is what a P31 *is*, and it is why every
+oscilloscope photograph of a slow sweep was taken with the shutter open. Raise
+Persistence or choose P7 for a tube that remembers.
 
-**Where `Presets.h` sets an integer-typed control to a fraction, the plugin
-rounds it to that control's minimum.** `Vectrex` asks for 0.60 Bits and gets one
-bit, which quantises each axis to ±1 and collapses the figure to two dashes;
-`Star` asks for 0.09 Sides and gets three; `Rosette Fold` and `Fuzz Box` ask for
-0.30 and 0.20 Folds and get one. FF_TYPE_INTEGER parameters hold the integer
-itself, not a 0..1 fraction — the same distinction `Controls.h` documents for
-option parameters.
+## Keeping this page in step with the C++
+
+Four things here mirror numbers that live in `source/` and nothing enforces them
+the way `check_shaders.py` enforces the GLSL. If you change any of them there,
+change them in `plugin.js` too:
+
+| in the C++ | in `plugin.js` |
+|---|---|
+| `kDefaults` in `Vectrix.cpp` | the `default:` on each parameter |
+| `kPresets` in `Presets.h` | the `presets:` block, mirrored column for column |
+| `Resolve()` in `Controls.cpp` | `resolve()` |
+| `renderParams()` in `Vectrix.cpp` | the `r.render` half of `resolve()` |
+
+Two of those carry a trap. **`kBeamOffRamp`**: the Beam control fades linearly to
+a true zero over the bottom two per cent of its travel, because the exponential
+alone bottoms out at a tenth of nominal and "Beam 0" would leave the gun on.
+**Halation runs to 4×, and the bright pass's knee is 0.04, not the header's
+0.5** — at 0.5 the pass finds nothing on an ordinary picture and both halation
+controls are measurably dead.
+
+`sides`, `driveFolds`, `crushBits`, `petalN`, `petalD` and `phaseStages` are
+FF_TYPE_INTEGER in the plugin and hold the integer itself, not a 0..1 fraction.
+The demo kit has no integer control, so they are dropdowns of their own values
+and `integerDefault()` converts. **Write the plugin's number, never the index.**
 
 ## Editing it
 
