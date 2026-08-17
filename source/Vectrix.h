@@ -68,10 +68,19 @@ public:
 	char* GetTextParameter( unsigned int index ) override;
 	FFResult SetTime( double time ) override;
 
-	/// Drive one frame without a host. The offline harness calls this so that it
-	/// exercises the same path a host does rather than a parallel one.
-	void RenderFrame( int width, int height, GLuint hostFBO, GLuint clipTexture,
-	                  float maxU, float maxV, double frameSeconds );
+	//---------------------------------------------------------------------
+	// There is deliberately no separate "render one frame offline" entry
+	// point.
+	//
+	// There was one, and `tools/vxtest` did not use it: it never advanced the
+	// clock and never read the spectrum, so through it the transport was
+	// frozen, both LFOs stood still and all four modulation slots read zero.
+	// A harness built on it would have reported thirteen live controls as
+	// dead. The harness drives `ProcessOpenGL` instead -- the real host
+	// sequence -- and is deterministic because it drives `SetTime` from its
+	// own frame counter. A second entry point would only ever be a second
+	// thing to keep in step with this one.
+	//---------------------------------------------------------------------
 
 private:
 	void declareParameters();

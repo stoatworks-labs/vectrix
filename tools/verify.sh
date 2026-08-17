@@ -39,8 +39,21 @@ head_() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 # ---------------------------------------------------------------------------
 head_ "Build (universal, both plugins, OFX, harness)"
 # ---------------------------------------------------------------------------
-# A fresh configure, because the thing most likely to be stale is the cache that
-# decides the architectures.
+# The build directory is DELETED first, and that is not belt and braces.
+#
+# `cmake -B build` on an existing tree re-uses the cache, and the cache is
+# exactly where the architecture list and the BUILD_OFX switch live. A developer
+# who configured once with `-DCMAKE_OSX_ARCHITECTURES=arm64 -DBUILD_OFX=OFF` for
+# a fast iteration loop -- which is the documented way to work in CLAUDE.md --
+# leaves a tree where this script happily rebuilds, finds a single-architecture
+# binary and no OFX bundle, and reports both as defects in the source.
+#
+# This file used to carry a comment claiming it did a fresh configure while
+# doing nothing of the kind. It cost a confusing verify run to notice, and had it
+# gone the other way -- a cache that happened to be right -- it would have cost a
+# single-architecture release instead.
+rm -rf build
+
 if cmake -B build -DCMAKE_BUILD_TYPE=Release >/tmp/vectrix-configure.log 2>&1 \
    && cmake --build build -j8 >/tmp/vectrix-build.log 2>&1; then
     ok "configured and built"
@@ -78,19 +91,36 @@ head_ "Entry points"
 # archive the linker may drop it, giving a bundle that loads, exports plugMain,
 # and reports that it contains no plugins -- so exporting the symbol is
 # necessary and not sufficient. The host load is what settles it.
+#
+# The symbol table is captured and matched with `case`, so there is NO PIPELINE
+# at any point. That is not a style choice and the obvious alternatives are both
+# wrong.
+#
+# `nm -gU "$bin" | grep -q _OfxGetPlugin` under `set -o pipefail` fails BECAUSE
+# the symbol was found: `grep -q` exits at the first match, `nm` takes SIGPIPE,
+# and pipefail propagates it. It is a race against how fast the producer
+# finishes, so it bit the 2.8 MB OFX bundle while the identical line against the
+# two smaller FFGL bundles passed, in the same run -- and the same command at a
+# prompt printed the symbol happily.
+#
+# Piping a captured variable through `printf` makes the writer small and the race
+# rare. Rare is not gone, and a check that fails one run in fifty is worse than
+# one that fails every time. Hence `case`.
+symbols_of() {
+    nm -gU "$1" 2>/dev/null || true
+}
+
 for binary in "$SRC_BIN" "$FX_BIN"; do
-    if nm -gU "$binary" 2>/dev/null | grep -q "_plugMain"; then
-        ok "exports plugMain: $(basename "$binary")"
-    else
-        bad "no plugMain: $(basename "$binary")"
-    fi
+    case "$(symbols_of "$binary")" in
+        *_plugMain*) ok "exports plugMain: $(basename "$binary")" ;;
+        *) bad "no plugMain: $(basename "$binary")" ;;
+    esac
 done
 
-if nm -gU "$OFX_BIN" 2>/dev/null | grep -q "_OfxGetPlugin"; then
-    ok "exports OfxGetPlugin"
-else
-    bad "no OfxGetPlugin in the OFX bundle"
-fi
+case "$(symbols_of "$OFX_BIN")" in
+    *_OfxGetPlugin*) ok "exports OfxGetPlugin" ;;
+    *) bad "no OfxGetPlugin in the OFX bundle" ;;
+esac
 
 # ---------------------------------------------------------------------------
 head_ "OFX bundle layout and signing"

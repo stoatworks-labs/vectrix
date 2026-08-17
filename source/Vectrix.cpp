@@ -44,6 +44,11 @@ static_assert( sizeof( kPresetParamIDs ) / sizeof( kPresetParamIDs[ 0 ] ) == pre
 static_assert( PT_COUNT - PT_ABOUT_TEXT == stoatworks::about::kParamCount,
                "the About enum run does not match the number of About parameters" );
 
+/// The bottom of the Beam control's travel, over which the exponential is faded
+/// linearly to a true zero. Short enough that it costs no useful resolution and
+/// long enough that the gun goes out smoothly rather than snapping off.
+constexpr float kBeamOffRamp = 0.02f;
+
 /// A defaults table, so that "what does this plugin do when you drop it on a
 /// layer" is one readable list rather than scattered through the declaration.
 struct Default
@@ -56,10 +61,10 @@ constexpr Default kDefaults[] = {
 	{ PT_DETAIL, 1.0f }, { PT_SEED, 1.0f },
 	{ PT_SOURCE, 0.0f },
 
-	{ PT_FREQ_X, 0.55f }, { PT_RATIO, 3.0f }, { PT_FREQ_Y, 0.55f }, { PT_PHASE_Y, 0.25f },
+	{ PT_FREQ_X, 0.77f }, { PT_RATIO, 3.0f }, { PT_FREQ_Y, 0.77f }, { PT_PHASE_Y, 0.25f },
 	{ PT_PWM_X, 0.5f }, { PT_PWM_Y, 0.5f }, { PT_DETUNE, 0.5f },
 
-	{ PT_SHAPE_RATE, 0.5f }, { PT_SHAPE_N, 5.0f }, { PT_SHAPE_INNER, 0.382f },
+	{ PT_SHAPE_RATE, 0.88f }, { PT_SHAPE_N, 5.0f }, { PT_SHAPE_INNER, 0.382f },
 	{ PT_PETAL_N, 3.0f }, { PT_PETAL_D, 1.0f }, { PT_TROCHOID, 0.4f },
 
 	{ PT_MESH, 3.0f }, { PT_MESH_DETAIL, 8.0f },
@@ -691,8 +696,17 @@ BeamGeometry::RenderParams VectrixPlugin::renderParams( const Resolved& resolved
 
 	//Exponential around a calibrated 1.0, the same shape resolume-scopes uses
 	//for its trace gain and for the same reason: the useful range is wide.
-	rp.beamPower = std::pow( 10.0f, -1.0f + 2.0f * std::clamp( params[ PT_BEAM_POWER ]
-	                                                           + modulation.For( ModTarget::BeamPower ), 0.0f, 1.0f ) );
+	//
+	//The linear fade over the bottom of the travel is not cosmetic. An
+	//exponential alone bottoms out at 0.1 -- a tenth of nominal, never zero --
+	//so "Beam 0" would leave the gun on, and the effect build's exact
+	//passthrough would be unreachable through the parameter list however
+	//correct the faceplate maths was. `vxtest --identity` caught precisely
+	//that, and it is the reason this control has a genuine off position.
+	const float beam = std::clamp( params[ PT_BEAM_POWER ] + modulation.For( ModTarget::BeamPower ),
+	                               0.0f, 1.0f );
+	rp.beamPower = std::pow( 10.0f, -1.0f + 2.0f * beam )
+	               * std::min( 1.0f, beam * ( 1.0f / kBeamOffRamp ) );
 	rp.spotSigma = Exponential( params[ PT_BEAM_FOCUS ], 0.0012f, 0.02f );
 	rp.spotDefocus = Linear( params[ PT_BEAM_DEFOCUS ], 0.0f, 2.0f );
 	rp.blankFloor  = Linear( params[ PT_BLANK_FLOOR ], 0.0f, 0.1f );
@@ -705,8 +719,28 @@ BeamGeometry::RenderParams VectrixPlugin::renderParams( const Resolved& resolved
 	                                                    + modulation.For( ModTarget::Persistence ),
 	                                                    0.0f, 1.0f ) );
 
-	rp.halation       = std::clamp( params[ PT_HALATION ], 0.0f, 1.0f );
+	//0..4, not 0..1. The halo is the trace convolved with a wide Gaussian, so it
+	//is inherently far dimmer than what cast it -- and a thin trace is dim to
+	//begin with. At unity gain the control moved 124 subpixels of a 2-megapixel
+	//frame by one part in 255, which is a control that technically works and is
+	//useless. Values above 1 are not a cheat: they stand for more scattering
+	//than one pass through the faceplate, which is what a thick tube does.
+	rp.halation       = Linear( params[ PT_HALATION ], 0.0f, 4.0f );
 	rp.halationRadius = std::clamp( params[ PT_HALATION_RADIUS ], 0.0f, 1.0f );
+
+	//The bright pass's knee, and it has to be set here rather than left at the
+	//header's default.
+	//
+	//A moving trace is nowhere near as bright as a stationary beam: `--point`
+	//measures a parked beam emitting 0.92, and a figure traced twice a frame is
+	//a small fraction of that. A knee at 0.5 therefore found nothing above it on
+	//any ordinary picture, the bloom buffer stayed empty, and BOTH halation
+	//controls were stone dead while every line of the bloom chain worked
+	//perfectly -- which `tools/sweep.py` caught and nothing else would have.
+	//
+	//Low enough that a normal trace scatters, high enough that the graticule and
+	//a blanked retrace do not.
+	rp.halationThreshold = 0.04f;
 
 	rp.tube.faceAspect     = Exponential( params[ PT_FACE_ASPECT ], 1.0f, 2.0f );
 	rp.tube.cornerRadius   = std::clamp( params[ PT_CORNER_RADIUS ], 0.0f, 1.0f );
@@ -728,42 +762,6 @@ BeamGeometry::RenderParams VectrixPlugin::renderParams( const Resolved& resolved
 	rp.frameSeconds = static_cast< float >( frameSeconds );
 
 	return rp;
-}
-
-void VectrixPlugin::RenderFrame( int width, int height, GLuint hostFBO, GLuint clipTexture,
-                                 float maxU, float maxV, double frameSeconds )
-{
-	( void )frameSeconds;
-
-	const Resolved resolved = Resolve( params, modulation, static_cast< double >( bpm ) );
-	engine.SetParams( resolved );
-
-	//Content may only change at a block boundary. A decoded file swapped in half
-	//way through would tear the path, and the renderer draws a tear as a line
-	//straight across the picture.
-	if( contentDirty )
-	{
-		std::string wanted;
-		{
-			std::lock_guard< std::mutex > lock( textMutex );
-			wanted = filePath;
-		}
-		engine.File().SetPath( wanted );
-		engine.SwapContent();
-		contentDirty = false;
-
-		if( !engine.File().Note().empty() )
-			diag::info( "audio file: " + engine.File().Note() );
-	}
-
-	engine.Advance( clock.FrameSeconds(), clock.Now() );
-
-	const int n            = clock.SamplesForThisFrame( engine.SampleRate() );
-	const Sample* samples  = engine.Render( n, clock.FrameSeconds() );
-
-	const GLint viewport[ 4 ] = { 0, 0, width, height };
-	beam.Render( samples, n, renderParams( resolved, clock.FrameSeconds() ),
-	             hostFBO, viewport, clipTexture, maxU, maxV );
 }
 
 FFResult VectrixPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )

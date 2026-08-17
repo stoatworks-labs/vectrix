@@ -188,6 +188,49 @@ a file that does not exist. Hence `sampleA`/`sampleB`, `ClipTexture`, `deposit`,
 for the life of the plugin instance until the host reloads it. Guarded in the
 trace vertex shader **and** clamped in the decay pass. Both, not either.
 
+### `set -o pipefail` plus `grep -q` is a race, and the big binary loses
+
+`tools/verify.sh` runs under `pipefail`. `nm -gU "$bin" | grep -q _OfxGetPlugin`
+therefore reports failure **because** the symbol was found: `grep -q` exits at
+the first match, `nm` takes SIGPIPE, and `pipefail` propagates it. It is a race
+against how fast the producer finishes, so the two small FFGL bundles passed and
+the 2.8 MB OFX bundle failed — while the identical command at a prompt printed
+the symbol happily. Capture into a variable first; `symbols_of()` does.
+
+### A control can be alive, correct, and still useless
+
+Both halation controls once moved 124 subpixels of a two-megapixel frame by one
+part in 255. Every line of the bloom chain worked. The bright pass's knee was
+simply left at the header's 0.5 while a moving trace emits a small fraction of
+that — `vxtest --point` measures a *parked* beam at 0.92 — so nothing ever got
+above the threshold and the bloom buffer stayed empty.
+
+Two things follow. The knee is now set explicitly in `renderParams()` rather than
+inherited from a default, and `Halation` maps to 0..4 rather than 0..1, because
+the halo is the trace convolved with a wide Gaussian and is inherently far dimmer
+than what cast it.
+
+The general point is worth keeping: **`sweep.py` asks whether a control changes
+the picture, not whether it changes it usefully.** A control that squeaks past
+the zero-difference test is a control nobody can operate. When one is only just
+alive, find out why before moving on.
+
+### Detail is not purely a cost control
+
+It changes the sample rate, and the deflection amplifier's bandwidth is clamped
+to just under Nyquist by `Svf::Set`. Bandwidth X defaults to about 39.7 kHz,
+which is *above* Draft's Nyquist and at 83% of Normal's — so switching Detail
+also moves the amplifier's corner, and the picture changes a little for a reason
+that is nothing to do with sample count.
+
+That is physically defensible (an amplifier cannot pass what the rate cannot
+carry) and it is still a surprise. `vxtest --rate` prints the comparison twice,
+once with the amplifier held inside every rate's Nyquist, and about 62% of the
+Fine-vs-Normal difference turns out to be the amplifier rather than the renderer.
+The remaining margin against the test's 1% limit is not large: raising the
+default figure speed or lowering Focus will trip it, and the fix then is to widen
+the tolerance only after checking the amplifier is not the cause.
+
 ### Denormals, on x86 only
 
 A reverb tail decaying below ~1e-38 triggers denormal handling, so the symptom is

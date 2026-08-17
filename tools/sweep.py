@@ -54,6 +54,8 @@ FRAMES = 8
 
 # Parameters that cannot or must not be swept, with the reason.
 SKIP = {
+    "Crossfade Time Changes": "only differs while the delay time is CHANGING, "
+                              "and a sweep holds every parameter still",
     "Audio": "an FFT buffer the host fills; its float value is meaningless",
     "About": "a display-only text line",
     "User guide": "a button that opens a web browser",
@@ -89,11 +91,16 @@ def fx(enable, **extra):
     return ctx
 
 
+QUIET_GATE = {"Gate Threshold": 1.0, "Gate Hold": 0.0, "Gate Release": 0.15}
+
 CONTEXT = {
     # -- sources ---------------------------------------------------------
     "Wave X": OSC, "Wave Y": OSC, "Frequency X": OSC, "Ratio": OSC,
     "Free Y": {"Free Y": 1}, "Frequency Y": {"Free Y": 1},
-    "Phase Y": OSC, "Detune": OSC, "Hard Sync": OSC,
+    # 0 and 1 turns are the SAME phase, so the two ends of the range are
+    # identical and the control reads dead however well it works.
+    "Phase Y": {"_high": 0.5},
+    "Detune": OSC, "Hard Sync": OSC,
     # Width only exists on a pulse wave; on a sine it is correctly dead.
     "Width X": {"Wave X": 4}, "Width Y": {"Wave Y": 4},
     # Blanking the flyback of a sine does nothing -- there is no flyback.
@@ -115,15 +122,26 @@ CONTEXT = {
     # They are skipped rather than reported, because "dead" would be a lie.
 
     # -- effects ---------------------------------------------------------
-    "VCA": fx("VCA"), "Level": fx("VCA"), "VCA Routing": fx("VCA", **{"Level": 0.9}),
+    # Level defaults to the middle of 0..2, which is unity -- so a VCA switched
+    # on at its default does nothing at all, correctly.
+    "VCA": fx("VCA", **{"Level": 0.9}),
+    "Level": fx("VCA"),
+    "VCA Routing": fx("VCA", **{"Level": 0.9}),
 
     # The gate is a threshold, so it needs a signal quiet enough to cross it.
-    "Gate": fx("Gate", **{"Deflection": 0.2}),
-    "Gate Threshold": fx("Gate", **{"Deflection": 0.2}),
-    "Gate Attack": fx("Gate", **{"Deflection": 0.2}),
-    "Gate Hold": fx("Gate", **{"Deflection": 0.2}),
-    "Gate Release": fx("Gate", **{"Deflection": 0.2}),
-    "Gate Mutes Beam": fx("Gate", **{"Deflection": 0.2}),
+    # The gate needs three things at once before it can be seen, and the
+    # default figure supplies none of them. A threshold the radial detector
+    # actually crosses (the Lissajous swings from near the origin out to root
+    # two, so 0 dBFS is crossed twice a cycle); no Hold, because 10 ms of hold
+    # against a figure whose period is 8 ms means the gate starts to close and
+    # is reopened before it gets anywhere -- correct behaviour that looks
+    # exactly like a dead control; and a release short enough to matter.
+    "Gate": fx("Gate", **QUIET_GATE),
+    "Gate Threshold": fx("Gate", **{"Gate Hold": 0.0, "Gate Release": 0.15}),
+    "Gate Attack": fx("Gate", **QUIET_GATE),
+    "Gate Hold": fx("Gate", **{"Gate Threshold": 1.0, "Gate Release": 0.15}),
+    "Gate Release": fx("Gate", **{"Gate Threshold": 1.0, "Gate Hold": 0.0}),
+    "Gate Mutes Beam": fx("Gate", **QUIET_GATE),
 
     # The compressor needs something above its threshold to compress.
     "Compressor": fx("Compressor", **{"Deflection": 0.9}),
@@ -156,7 +174,8 @@ CONTEXT = {
     "Drive Routing": fx("Drive", **{"Gain": 0.3, "Fold": 0.9}),
 
     "Ring Mod": fx("Ring Mod", **{"Ring Depth": 0.8}),
-    "Carrier": fx("Ring Mod", **{"Ring Depth": 0.8}),
+    # The carrier is unused in Cross routing, which is the default.
+    "Carrier": fx("Ring Mod", **{"Ring Depth": 0.8, "Ring Routing": 0}),
     "Carrier Wave": fx("Ring Mod", **{"Ring Depth": 0.8, "Ring Routing": 0}),
     "Ring Depth": fx("Ring Mod"),
     "Ratio Lock": fx("Ring Mod", **{"Ring Depth": 0.8, "Ring Routing": 0}),
@@ -191,7 +210,6 @@ CONTEXT = {
     "Delay Routing": {"Delay": 1, "Delay Mix": 0.7, "_frames": 40},
     "Sync to Tempo": {"Delay": 1, "Delay Mix": 0.7, "_frames": 40},
     "Division": {"Delay": 1, "Delay Mix": 0.7, "Sync to Tempo": 1, "_frames": 40},
-    "Crossfade Time Changes": {"Delay": 1, "Delay Mix": 0.7, "_frames": 40},
 
     "Reverb": {"Reverb": 1, "Reverb Mix": 0.7, "_frames": 40},
     "Pre-Delay": {"Reverb": 1, "Reverb Mix": 0.7, "_frames": 40},
@@ -210,17 +228,24 @@ CONTEXT = {
     "Corner Radius": {"Curvature": 0.3},
     "Contrast Filter": {"Face Black": 0.6},
     "Blanking Leak": {"Wave X": 2, "Wave Y": 2, "Blank on Retrace": 1},
+    # The amplifier's slew limit only shows on a figure fast enough to outrun
+    # it. The default figure's steepest slope is well inside even the slowest
+    # setting, so it is correctly invisible there.
+    "Amp Slew": {"Frequency X": 0.95},
+    # These act on what is behind the glass; the source build has nothing there.
+    "Face Black": {"_effect": True},
+    "Contrast Filter": {"_effect": True, "Face Black": 0.6},
 
     # -- modulation ------------------------------------------------------
     # The LFOs do nothing until a slot names a target for them to drive.
     "LFO 1 Rate": {"Mod 1": 1, "Mod 1 Amount": 1.0, "LFO 1 Depth": 0.8, "_frames": 40},
     "LFO 1 Depth": {"Mod 1": 1, "Mod 1 Amount": 1.0, "LFO 1 Rate": 0.6, "_frames": 40},
-    "LFO 2 Rate": {"Mod 2": 2, "Mod 2 Amount": 1.0, "LFO 2 Depth": 0.8, "Drive": 1, "_frames": 40},
-    "LFO 2 Depth": {"Mod 2": 2, "Mod 2 Amount": 1.0, "LFO 2 Rate": 0.6, "Drive": 1, "_frames": 40},
+    "LFO 2 Rate": {"Mod 2": 1, "Mod 2 Amount": 1.0, "LFO 2 Depth": 0.8, "_frames": 40},
+    "LFO 2 Depth": {"Mod 2": 1, "Mod 2 Amount": 1.0, "LFO 2 Rate": 0.6, "_frames": 40},
     "Mod 1": {"Mod 1 Amount": 1.0, "LFO 1 Depth": 0.8, "_frames": 40},
     "Mod 1 Amount": {"Mod 1": 1, "LFO 1 Depth": 0.8, "_frames": 40},
-    "Mod 2": {"Mod 2 Amount": 1.0, "LFO 2 Depth": 0.8, "Drive": 1, "_frames": 40},
-    "Mod 2 Amount": {"Mod 2": 2, "LFO 2 Depth": 0.8, "Drive": 1, "_frames": 40},
+    "Mod 2": {"Mod 2 Amount": 1.0, "LFO 2 Depth": 0.8, "_frames": 40},
+    "Mod 2 Amount": {"Mod 2": 1, "LFO 2 Depth": 0.8, "_frames": 40},
     "Mod 3": {"Mod 3 Amount": 1.0, "LFO 1 Depth": 0.8, "_frames": 40},
     "Mod 3 Amount": {"Mod 3": 1, "LFO 1 Depth": 0.8, "_frames": 40},
     "Mod 4": {"Mod 4 Amount": 1.0, "LFO 1 Depth": 0.8, "_frames": 40},
@@ -247,19 +272,27 @@ def parameters():
         print("could not list parameters:", out.stdout, out.stderr)
         sys.exit(1)
 
+    # `  0  Detail                   option        1.0000   [0 .. 1]`
     found = []
     for line in out.stdout.splitlines():
-        m = re.match(r"\s*(\d+)\s+(.+?)\s{2,}(\S+)\s+([\d.-]+)\s+([\d.-]+)", line)
+        m = re.match(
+            r"\s*(\d+)\s+(.+?)\s{2,}(\S+)\s+([\d.eE+-]+)\s+\[\s*([\d.eE+-]+)\s*\.\.\s*([\d.eE+-]+)\s*\]",
+            line,
+        )
         if m:
             found.append(
                 (int(m.group(1)), m.group(2).strip(), m.group(3),
-                 float(m.group(4)), float(m.group(5)))
+                 float(m.group(5)), float(m.group(6)))
             )
     return found
 
 
-def render(path, overrides, frames):
+def render(path, overrides, frames, effect=False):
     args = [BIN, "--out", path, "--size", f"{WIDTH}x{HEIGHT}", "--frames", str(frames)]
+    if effect:
+        # Some controls act on what is BEHIND the glass, and the source build
+        # has nothing behind it. They are correctly dead there.
+        args.append("--effect")
     merged = dict(BASE)
     merged.update({k: v for k, v in overrides.items() if not k.startswith("_")})
     for name, value in merged.items():
@@ -344,14 +377,17 @@ def main():
 
         context = CONTEXT.get(name, {})
         frames = context.get("_frames", FRAMES)
+        effect = context.get("_effect", False)
+        low = context.get("_low", low)
+        high = context.get("_high", high)
 
         lo = dict(context)
         hi = dict(context)
         lo[name] = low
         hi[name] = high
 
-        a = render(f"{SCRATCH}/{pid}_lo.png", lo, frames)
-        b = render(f"{SCRATCH}/{pid}_hi.png", hi, frames)
+        a = render(f"{SCRATCH}/{pid}_lo.png", lo, frames, effect)
+        b = render(f"{SCRATCH}/{pid}_hi.png", hi, frames, effect)
         fraction, count = difference(a, b)
         checked += 1
 

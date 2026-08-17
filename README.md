@@ -128,9 +128,16 @@ there.
 
 ## Trying it
 
-A browser demo of the tube and the beam maths runs at
+A browser demo runs at
 [vectrix-demo.stoatworks-labs.com](https://vectrix-demo.stoatworks-labs.com).
 Nothing you load there leaves your machine.
+
+It carries the **whole renderer** — the same nine shader sources, checked
+character for character against the plugin's by `demo/tools/check_shaders.py` —
+and a **subset** of the signal chain: the oscillator and the shapes, plus the
+rectifier, slew limiter, wavefolder, ring modulator, bitcrusher, phaser and
+delay. The wireframe, audio-file and trace sources and the remaining effects are
+not in it. The page says so too.
 
 ## Build
 
