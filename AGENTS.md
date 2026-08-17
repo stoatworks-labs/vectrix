@@ -314,9 +314,12 @@ a control can be stone dead while everything compiles, links, loads and renders.
 
 **Assumed, and not yet checked:**
 
-- **Never rendered through Resolume onto real footage.** Loading cleanly is not
-  the same as looking right. Parameter groups, the dropdowns, Arena's real
-  texture sizes and its premultiplication behaviour are all unconfirmed.
+- ~~Never rendered through Resolume.~~ **Both plugins were loaded and run in
+  Resolume Arena on 2026-08-17** (Allan's own report), so the parameter groups,
+  the dropdowns and Arena's real texture sizes are confirmed to work. What that
+  does *not* settle is whether the input is genuinely premultiplied — the
+  effect build divides alpha out on the way in, and a picture that looks right
+  on opaque footage would look right either way.
 - **Whether Resolume's `SetTime` for a *source* plugin is the clip transport or
   the composition clock is not known.** It matters for the Locked file sync mode.
 - **The trace readback has never been measured in a real host.** This is the

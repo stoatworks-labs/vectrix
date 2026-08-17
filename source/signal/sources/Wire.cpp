@@ -45,9 +45,19 @@ View toView( const Vec3& v, float sx, float cx, float sy, float cy, float sz, fl
 /// of the near plane.
 void projectPoint( const View& v, float distance, float& outX, float& outY )
 {
+	//The camera distance IS the focal length, so an object sitting at that
+	//distance projects at unit scale and moving the camera in magnifies it.
+	//
+	//This used to divide the result by `distance` as well, which cancels the
+	//focal length and leaves a bare `v.x / v.z` -- a projection with a focal
+	//length of one. Every wireframe was therefore miniaturised by the camera
+	//distance: at the default of 4 the landscape came out a quarter size, a
+	//thin smear across the middle of the tube, and the cube and the globe with
+	//it. Nothing reported a problem, because Camera still visibly changed the
+	//picture and `sweep.py` only asks whether a control does something.
 	const float s = distance / std::max( v.z, kNearPlane );
-	outX          = v.x * s / distance;
-	outY          = v.y * s / distance;
+	outX          = v.x * s;
+	outY          = v.y * s;
 }
 } // namespace
 

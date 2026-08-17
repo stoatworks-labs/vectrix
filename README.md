@@ -167,8 +167,10 @@ python3 tools/sweep.py       # no dead controls
 
 See the "what is genuinely verified, and what is assumed" section of
 [AGENTS.md](AGENTS.md), which is blunt about it. The short version: the physics
-is measured by the harness, and **it has not yet been run through Resolume onto
-real footage**. Loading cleanly is not the same as looking right.
+is measured by the harness, and both plugins have been **loaded and run in
+Resolume Arena**. What is still unconfirmed is narrower — whether Arena's input
+is genuinely premultiplied, and how the Trace source's readback behaves for
+frame rate in a real host.
 
 ## OpenFX — Resolve, Vegas, Nuke, Natron
 

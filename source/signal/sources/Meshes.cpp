@@ -10,6 +10,12 @@ namespace
 {
 constexpr double kTwoPi = 6.283185307179586476925286766559;
 
+/// How far up the frame each unit of depth lifts a mountain ridge. Enough that
+/// the stack reads as receding ground rather than as one band, small enough
+/// that the ridges still overlap -- an Unknown Pleasures plot with no overlap
+/// is just a list of graphs.
+constexpr float kRidgeLift = 0.5f;
+
 /// Three octaves of value noise. Hash-based rather than table-based so that
 /// scrolling by moving the sample origin is exactly repeatable -- a ridge that
 /// leaves the far end and comes back is bit-identical, which is what stops the
@@ -188,8 +194,20 @@ Wire buildMountains( int ridges, int columns, std::uint32_t seed, float offset )
 			const float h = valueNoise( x * 2.0f, ( z + offset ) * 2.0f, seed );
 
 			//Taper the extremes so the range does not clip flat against the
-			//frame edge, and lift the far ridges slightly for separation.
-			const float height = ( h - 0.5f ) * 1.1f;
+			//frame edge, then LIFT the far ridges up the frame.
+			//
+			//The lift is the whole construction and it was missing: without it
+			//every ridge projects onto the same horizon line, the stack
+			//collapses into one band a few percent of the frame tall, and the
+			//landscape renders as a horizontal smear. The comment here claimed
+			//to do it and the arithmetic did not.
+			//
+			//It also makes the hidden-line removal mean something. Far ridges
+			//sit higher, so a near ridge only occludes one where it has a peak
+			//tall enough to rise in front of it -- which is exactly the
+			//Unknown Pleasures silhouette, and exactly what the running
+			//per-column maximum in WireSource::project() measures.
+			const float height = ( h - 0.5f ) * 1.1f + z * kRidgeLift;
 
 			w.verts.push_back( Vec3{ x, height, z } );
 			stroke.push_back( static_cast< int >( w.verts.size() ) - 1 );

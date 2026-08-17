@@ -21,6 +21,8 @@
 
         --out PATH  render a frame     --size WxH   --frames N   --preset N
         --list      every parameter    --set ID=V (or "Name=V")  --effect
+        --pipe      raw RGBA frames on stdout, for the project video
+        --script    a cue sheet driving it            --fps N
 
     ## Determinism
 
@@ -35,19 +37,17 @@
     something real to divide. Left at the SDK's defaults, `bpm` is whatever the
     base class was constructed with and the Sync switch would look dead.
 
-    ## Why the frames go through `ProcessOpenGL` and not `RenderFrame`
+    ## Why every frame goes through `ProcessOpenGL`
 
-    `VectrixPlugin::RenderFrame` is advertised as the harness's entry point, and
-    it is not usable as one: it ignores its `frameSeconds` argument, never calls
-    `Clock::Update`, and never calls `updateAudio`. Through it the clock is
-    frozen at 1/60 and zero, the two LFOs never advance and every modulation
-    slot reads zero for the life of the run -- so a harness built on it would
-    report thirteen live controls as dead and would measure a plugin whose
-    modulation section does not exist. `ProcessOpenGL` is the sequence a host
-    actually uses, it is deterministic once `SetTime` is driven, and it is what
-    the checks below use. Fixing `RenderFrame` to take its own `frameSeconds`
-    and drive the clock would make it usable and is worth doing; until then it
-    is dead code with a comment claiming otherwise.
+    There is no back door and there should not be one. `ProcessOpenGL` is the
+    call a host makes, and it is the only path that advances the clock, updates
+    the modulation and reads the transport -- so it is the only path on which
+    the LFOs, the audio-driven slots and the tempo-synced delay are alive at
+    all. An earlier `RenderFrame` shortcut did none of those and has since been
+    deleted; a harness built on it would have reported thirteen live controls as
+    dead. `InitGL` is called once per instance rather than per frame, because
+    `BeamGeometry::InitGL` compiles five shaders and generates a VAO and a VBO
+    without deleting the previous set.
 
     ## What each test can and cannot catch
 
@@ -92,6 +92,13 @@
 
     None of them catches a uniform whose name does not match the GLSL, because
     `glUniform` with location -1 is a documented no-op. See `tools/sweep.py`.
+
+    ## `--pipe` is not a check
+
+    It renders the project video, and the long comment above `runPipe` says how
+    and why. The one thing to know before reading anything else: **the source
+    build's pipe reads nothing from stdin**, because the source plugin has no
+    input. See there.
 */
 
 #include <OpenGL/OpenGL.h>
@@ -105,8 +112,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <limits>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -348,13 +357,17 @@ bool startPlugin( VectrixPlugin& plugin, const Target& target )
 	return plugin.InitGL( &viewport ) == FF_SUCCESS;
 }
 
-bool renderFrame( VectrixPlugin& plugin, const Target& target, int frameIndex, GLuint clip = 0 )
+/// `secondsPerFrame` is only ever anything but the harness's own 1/60 for
+/// `--pipe`, where the render has to advance at the rate the finished video will
+/// be played back at. Every check in this file leaves it alone.
+bool renderFrame( VectrixPlugin& plugin, const Target& target, int frameIndex, GLuint clip = 0,
+                  double secondsPerFrame = kFrameSeconds )
 {
 	// The whole of the harness's determinism is these two lines. `Clock::Update`
 	// takes the wall clock only when the host has never called SetTime, so
 	// driving it from the frame counter is what stops the picture depending on
 	// how long the process has been alive.
-	const double seconds = static_cast< double >( frameIndex ) * kFrameSeconds;
+	const double seconds = static_cast< double >( frameIndex ) * secondsPerFrame;
 	plugin.SetTime( seconds );
 
 	// 120 BPM in 4/4 from time zero, so bar N starts at exactly 2N seconds and
@@ -397,6 +410,182 @@ std::map< std::string, unsigned int > parameterIndex( VectrixPlugin& plugin )
 			byName[ name ] = id;
 	}
 	return byName;
+}
+
+/// `--set`, resolved the way `--out` has always resolved it: a bare number is an
+/// id, which is what `tools/sweep.py` drives, and anything else is a display
+/// name, which is what a person types. Returns how many did not resolve.
+int applySets( VectrixPlugin& plugin, const std::vector< std::pair< std::string, float > >& sets )
+{
+	const std::map< std::string, unsigned int > byName = parameterIndex( plugin );
+	int unresolved = 0;
+
+	for( const auto& set : sets )
+	{
+		char* end           = nullptr;
+		const long asNumber = std::strtol( set.first.c_str(), &end, 10 );
+		unsigned int id     = PT_COUNT;
+
+		if( end != nullptr && *end == '\0' && !set.first.empty() && asNumber >= 0 && asNumber < PT_COUNT )
+		{
+			id = static_cast< unsigned int >( asNumber );
+		}
+		else
+		{
+			const auto found = byName.find( set.first );
+			if( found != byName.end() )
+				id = found->second;
+		}
+
+		if( id >= PT_COUNT )
+		{
+			std::fprintf( stderr, "vxtest: no parameter called \"%s\"\n", set.first.c_str() );
+			++unresolved;
+			continue;
+		}
+		plugin.SetFloatParameter( id, set.second );
+	}
+
+	return unresolved;
+}
+
+//---------------------------------------------------------------------------
+// Parameter automation for --pipe.
+//
+// A plain text file of `frame  Parameter Name  value` lines. Values are held
+// before the first key and after the last, and linearly interpolated between,
+// so the piece is edited by editing the cue sheet rather than by editing code.
+// Identical in grammar to `tiltest`'s, deliberately: the cue sheets and the
+// `render.py` beside them in stoatworks-backend are shared machinery.
+//
+// **An option or a boolean steps; it does not ramp.** The interpolation here is
+// linear and `Option()` reads a dropdown by rounding, so a key that changes
+// Source at frame 100 and the next key for Source at frame 400 does not hold the
+// old value until 100 -- it walks through every entry in between and crosses a
+// rounding boundary somewhere nobody chose. Vectrix is full of these: Source,
+// Wave X, Wave Y, Shape, Mesh, Phosphor, Detail, Ratio, every Routing, and every
+// boolean. The fix is a **hold key at the END of every section the value must
+// not move in**, not merely a key where it changes. resolume-scopes lost a whole
+// re-render to exactly this. `warnAboutRamps` below shouts about it.
+//---------------------------------------------------------------------------
+using Track = std::vector< std::pair< int, float > >;
+
+std::map< std::string, Track > loadScript( const std::string& path, std::string& error )
+{
+	std::map< std::string, Track > tracks;
+	std::ifstream file( path );
+	if( !file )
+	{
+		error = "cannot open " + path;
+		return tracks;
+	}
+
+	std::string line;
+	int lineNumber = 0;
+	while( std::getline( file, line ) )
+	{
+		++lineNumber;
+		const size_t hash = line.find( '#' );
+		if( hash != std::string::npos )
+			line.erase( hash );
+		std::istringstream in( line );
+
+		int frame = 0;
+		if( !( in >> frame ) )
+			continue;//blank or comment
+
+		//The name is everything up to the last token, because parameters have
+		//spaces in them and the value never does.
+		std::vector< std::string > words;
+		std::string word;
+		while( in >> word )
+			words.push_back( word );
+		if( words.size() < 2 )
+		{
+			error = path + ":" + std::to_string( lineNumber ) + ": expected `frame Parameter Name value`";
+			return {};
+		}
+
+		const float value = std::strtof( words.back().c_str(), nullptr );
+		words.pop_back();
+		std::string name = words.front();
+		for( size_t i = 1; i < words.size(); ++i )
+			name += " " + words[ i ];
+
+		tracks[ name ].emplace_back( frame, value );
+	}
+
+	for( auto& entry : tracks )
+		std::sort( entry.second.begin(), entry.second.end() );
+	return tracks;
+}
+
+float valueAt( const Track& track, int frame )
+{
+	if( track.empty() )
+		return 0.0f;
+	if( frame <= track.front().first )
+		return track.front().second;
+	if( frame >= track.back().first )
+		return track.back().second;
+
+	for( size_t i = 1; i < track.size(); ++i )
+	{
+		if( frame <= track[ i ].first )
+		{
+			const auto& a = track[ i - 1 ];
+			const auto& b = track[ i ];
+			const float span = static_cast< float >( b.first - a.first );
+			const float t = span > 0.0f ? ( static_cast< float >( frame - a.first ) / span ) : 1.0f;
+			return a.second + ( b.second - a.second ) * t;
+		}
+	}
+	return track.back().second;
+}
+
+/// The trap in the block comment above, caught rather than only documented.
+///
+/// A stepping parameter that ramps is not an error -- the cue sheet is allowed
+/// to say it, and a two-frame step between adjacent entries is a legitimate way
+/// to write a cut -- so this warns and renders. What it will not do is let a
+/// forty-second drift through six dropdown entries go out unremarked, which is
+/// the shape the failure actually takes.
+void warnAboutRamps( VectrixPlugin& plugin, const std::string& name, unsigned int id, const Track& track )
+{
+	const unsigned int type = plugin.GetParamType( id );
+	if( type != FF_TYPE_OPTION && type != FF_TYPE_BOOLEAN && type != FF_TYPE_INTEGER )
+		return;
+
+	for( size_t i = 1; i < track.size(); ++i )
+	{
+		const int frames = track[ i ].first - track[ i - 1 ].first;
+		if( frames <= 1 || track[ i ].second == track[ i - 1 ].second )
+			continue;
+
+		std::fprintf( stderr,
+		              "vxtest: \"%s\" steps rather than ramps, but the script slides it from %g to %g\n"
+		              "        over frames %d..%d -- it will pass through every value between. Add a\n"
+		              "        hold key at frame %d to make the change a cut.\n",
+		              name.c_str(), static_cast< double >( track[ i - 1 ].second ),
+		              static_cast< double >( track[ i ].second ),
+		              track[ i - 1 ].first, track[ i ].first, track[ i ].first - 1 );
+	}
+}
+
+/// Raw frames off stdin, in whole frames only. A short read at the end is a
+/// truncated frame, which is not something to render half of.
+bool readExactly( void* into, size_t bytes )
+{
+	unsigned char* p = static_cast< unsigned char* >( into );
+	size_t got = 0;
+	while( got < bytes )
+	{
+		const size_t n = fread( p + got, 1, bytes - got, stdin );
+		if( n == 0 )
+			return false;//clean EOF, or a short final frame we cannot use
+		got += n;
+	}
+	return true;
 }
 
 /// A coloured gradient with a couple of hard edges, for the effect build to sit
@@ -1759,6 +1948,172 @@ int listParameters()
 	return 0;
 }
 
+/**
+    --pipe: the project video, rendered rather than filmed.
+
+    Frames leave as raw RGBA on stdout, so ffmpeg does the encoding and this does
+    the tube. That is how the project video is made, and it is a render rather
+    than a screen recording for a reason worth stating: an FFGL plugin has no
+    window and no UI of its own -- its control surface IS Resolume's inspector --
+    so "filming the app" would mean filming Arena, whose clip grid and effects
+    browser are custom-drawn with nothing in the accessibility tree to address.
+
+    What is on screen is genuinely this plugin's output, from the same class
+    Resolume loads. It is just not a photograph of Resolume, and the end card
+    says so.
+
+    ## The half of this that is not like the rest of the family
+
+    **By default the pipe reads nothing from stdin.** Every other harness in the
+    fleet is an effect: a frame goes in, a frame comes out, and the run ends when
+    the input stream does. Vectrix ships two plugins and the default one --
+    Vectrix, the source -- takes *no input at all*. It is an oscillator and a
+    tube; there is nothing to put through it. So the default here generates
+    `--frames N` frames and stops on the count, because there is no stream to run
+    out of, and stdin is never read.
+
+    `--effect` selects the other build, Vectrix Trace, which paints the incoming
+    clip on the tube face and can derive its path from it. That one behaves
+    exactly like `tiltest`: one frame in, one frame out, stopping at EOF, and
+    `--frames` is ignored because the stream decides.
+
+    Both write one frame of `width * height * 4` bytes per input or per count,
+    top-down, which is the order ffmpeg hands over and expects back.
+*/
+int runPipe( int width, int height, int frames, double fps, bool effect,
+             const std::string& scriptPath,
+             const std::vector< std::pair< std::string, float > >& sets )
+{
+	std::map< std::string, Track > tracks;
+	if( !scriptPath.empty() )
+	{
+		std::string error;
+		tracks = loadScript( scriptPath, error );
+		if( !error.empty() )
+		{
+			std::fprintf( stderr, "vxtest: %s\n", error.c_str() );
+			return 1;
+		}
+	}
+
+	Target target = makeTarget( width, height, false );
+
+	VectrixPlugin plugin( effect );
+	if( applySets( plugin, sets ) > 0 )
+	{
+		releaseTarget( target );
+		return 1;
+	}
+
+	//Resolve the cue sheet's names once, against the plugin itself. A cue for a
+	//parameter that does not exist is a silent no-op otherwise, and the first
+	//sign of it is a beat in the finished video where nothing happens.
+	const std::map< std::string, unsigned int > byName = parameterIndex( plugin );
+	std::vector< std::pair< unsigned int, const Track* > > bound;
+	for( const auto& entry : tracks )
+	{
+		const auto found = byName.find( entry.first );
+		if( found == byName.end() )
+		{
+			std::fprintf( stderr, "vxtest: no parameter named \"%s\" in the script\n",
+			              entry.first.c_str() );
+			releaseTarget( target );
+			return 1;
+		}
+		warnAboutRamps( plugin, entry.first, found->second, entry.second );
+		bound.emplace_back( found->second, &entry.second );
+	}
+
+	//The clip, for the effect build only. The source build has no input and this
+	//stays zero, which is what tells ProcessOpenGL there is no texture to bind.
+	GLuint input = 0;
+	if( effect )
+	{
+		glGenTextures( 1, &input );
+		glBindTexture( GL_TEXTURE_2D, input );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		glBindTexture( GL_TEXTURE_2D, 0 );
+	}
+
+	if( !startPlugin( plugin, target ) )
+	{
+		std::fprintf( stderr, "vxtest: InitGL failed\n" );
+		if( input != 0 )
+			glDeleteTextures( 1, &input );
+		releaseTarget( target );
+		return 1;
+	}
+
+	const size_t frameBytes = static_cast< size_t >( width ) * height * 4;
+	std::vector< unsigned char > incoming( frameBytes );
+
+	//Seconds per frame for SetTime. It has to be the rate the finished video will
+	//be played at or the picture runs slow: this plugin's whole output is a
+	//function of elapsed time, unlike the pure-function effects the rest of the
+	//family films. `Clock` clamps a frame to [1/240, 1/24], so anything under 24
+	//fps is silently rendered as 24.
+	const double secondsPerFrame = fps > 0.0 ? 1.0 / fps : kFrameSeconds;
+
+	int frame  = 0;
+	int status = 0;
+	for( ;; )
+	{
+		if( effect )
+		{
+			if( !readExactly( incoming.data(), frameBytes ) )
+				break;
+
+			//ffmpeg hands over rows top-down and GL wants them bottom-up.
+			//Flipping on the way in and again on the way out keeps every
+			//coordinate in this file meaning what it says everywhere else.
+			const std::vector< unsigned char > flipped = flipRows( incoming, width, height );
+
+			glBindTexture( GL_TEXTURE_2D, input );
+			glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
+			                 flipped.data() );
+			glBindTexture( GL_TEXTURE_2D, 0 );
+		}
+		else if( frame >= std::max( 1, frames ) )
+		{
+			break;
+		}
+
+		for( const auto& track : bound )
+			plugin.SetFloatParameter( track.first, valueAt( *track.second, frame ) );
+
+		if( !renderFrame( plugin, target, frame, input, secondsPerFrame ) )
+		{
+			std::fprintf( stderr, "vxtest: render failed at frame %d\n", frame );
+			status = 1;
+			break;
+		}
+
+		const std::vector< unsigned char > out = flipRows( readBytes( target ), width, height );
+		if( fwrite( out.data(), 1, frameBytes, stdout ) != frameBytes )
+		{
+			std::fprintf( stderr, "vxtest: short write at frame %d\n", frame );
+			status = 1;
+			break;
+		}
+
+		++frame;
+	}
+
+	fflush( stdout );
+	std::fprintf( stderr, "vxtest: %d frames (%s build, %g fps)\n", frame,
+	              effect ? "effect" : "source", fps );
+
+	plugin.DeInitGL();
+	if( input != 0 )
+		glDeleteTextures( 1, &input );
+	releaseTarget( target );
+	return status;
+}
+
 void usage()
 {
 	std::printf(
@@ -1775,32 +2130,50 @@ void usage()
 		"  --all               every check above, with a summary\n"
 		"\n"
 		"  --out PATH          render one frame to a PNG\n"
-		"  --size WxH          the raster for --out (default 1920x1080)\n"
-		"  --frames N          frames to render before capturing (default 8)\n"
+		"  --size WxH          the raster (default 1920x1080)\n"
+		"  --frames N          frames to render (default 8). For --out, how many to\n"
+		"                      render before capturing the last; for --pipe on the\n"
+		"                      source build, how many to emit\n"
 		"  --preset N          apply factory preset N (1 .. %d)\n"
-		"  --effect            the effect build, over a test clip\n"
+		"  --effect            the effect build, Vectrix Trace, over an input\n"
 		"  --set ID=VALUE      set a parameter, by id or by name (repeatable)\n"
-		"  --list              every parameter: id, name, type, current value, range\n",
+		"  --list              every parameter: id, name, type, current value, range\n"
+		"\n"
+		"  --pipe              raw RGBA frames out on stdout, for the project video\n"
+		"                      SOURCE BUILD (the default): reads NOTHING from stdin.\n"
+		"                      The source plugin takes no input, so there is no stream\n"
+		"                      to run out of -- it generates --frames N frames and stops.\n"
+		"                      WITH --effect: one raw RGBA frame in on stdin, one out,\n"
+		"                      stopping at EOF, and --frames is ignored.\n"
+		"  --script PATH       parameter automation: `frame Parameter Name value`\n"
+		"                      Keys are held before the first and after the last, and\n"
+		"                      LINEARLY INTERPOLATED between. An option or a boolean is\n"
+		"                      read by rounding, so it steps -- a slide from one entry\n"
+		"                      to another passes through everything in between. Give\n"
+		"                      Source, Wave X/Y, Shape, Mesh, Phosphor, Detail, Ratio\n"
+		"                      and every Routing a HOLD KEY AT THE END of each section\n"
+		"                      they must not move in, not merely one where they change.\n"
+		"  --fps N             the rate the pipe's clock advances at (default 60).\n"
+		"                      Must match the rate the footage is encoded at, or the\n"
+		"                      picture runs slow -- this plugin's output is a function\n"
+		"                      of elapsed time. Clock clamps a frame to 24..240 fps.\n",
 		presets::kCount );
 }
 } // namespace
 
 int main( int argc, char** argv )
 {
-	// Line-buffered, so that a failure written to stderr appears where it
-	// happened rather than ahead of the whole run's stdout. Every test here
-	// prints its measurements before deciding whether they are a failure, and
-	// the two streams interleaving wrongly makes the report unreadable.
-	std::setvbuf( stdout, nullptr, _IOLBF, 0 );
-
 	std::string outPath;
+	std::string scriptPath;
 	std::vector< std::pair< std::string, float > > sets;
 
 	int width   = 1920;
 	int height  = 1080;
 	int frames  = 8;
 	int preset  = 0;
+	double fps  = 60.0;
 	bool effect = false;
+	bool pipeMode = false;
 
 	bool doList     = false;
 	bool doEnergy   = false;
@@ -1821,6 +2194,9 @@ int main( int argc, char** argv )
 		else if( arg == "--frames" ) frames = std::atoi( next().c_str() );
 		else if( arg == "--preset" ) preset = std::atoi( next().c_str() );
 		else if( arg == "--effect" ) effect = true;
+		else if( arg == "--pipe" ) pipeMode = true;
+		else if( arg == "--script" ) scriptPath = next();
+		else if( arg == "--fps" ) fps = std::atof( next().c_str() );
 		else if( arg == "--list" ) doList = true;
 		else if( arg == "--energy" ) doEnergy = true;
 		else if( arg == "--dwell" ) doDwell = true;
@@ -1857,13 +2233,25 @@ int main( int argc, char** argv )
 		}
 	}
 
-	const bool anyGL = doEnergy || doDwell || doRate || doPoint || doBlank || doIdentity || !outPath.empty();
+	const bool anyGL = doEnergy || doDwell || doRate || doPoint || doBlank || doIdentity
+	                   || !outPath.empty() || pipeMode;
 	const bool any   = anyGL || doFx || doDrift || doList;
 	if( !any )
 	{
 		usage();
 		return 1;
 	}
+
+	// Line-buffered, so that a failure written to stderr appears where it
+	// happened rather than ahead of the whole run's stdout. Every check here
+	// prints its measurements before deciding whether they are a failure, and
+	// the two streams interleaving wrongly makes the report unreadable.
+	//
+	// Not in --pipe: there stdout is a stream of raw frames, and it wants the
+	// biggest block writes it can get rather than a flush per newline that
+	// happens to appear in the pixels.
+	if( !pipeMode )
+		std::setvbuf( stdout, nullptr, _IOLBF, 0 );
 
 	int failures = 0;
 
@@ -1887,6 +2275,23 @@ int main( int argc, char** argv )
 		}
 	}
 
+	// The pipe owns stdout, so it is the whole run when it is asked for: mixing a
+	// PNG's progress line into a frame stream would corrupt the video and the
+	// symptom would be a torn picture rather than an error.
+	if( pipeMode )
+	{
+		// At the front, so an explicit --set still wins over the preset it sits
+		// on top of -- which is the order --out has always applied them in.
+		if( preset > 0 )
+			sets.insert( sets.begin(),
+			             std::make_pair( std::string( "Preset" ), static_cast< float >( preset ) ) );
+
+		const int status = runPipe( width, height, frames, fps, effect, scriptPath, sets );
+		CGLSetCurrentContext( nullptr );
+		CGLDestroyContext( context );
+		return status;
+	}
+
 	if( doEnergy )
 		failures += checkEnergy();
 	if( doDwell )
@@ -1908,34 +2313,7 @@ int main( int argc, char** argv )
 		if( preset > 0 )
 			plugin.SetFloatParameter( PT_PRESET, static_cast< float >( preset ) );
 
-		const std::map< std::string, unsigned int > byName = parameterIndex( plugin );
-		for( const auto& set : sets )
-		{
-			// A bare number is an id, which is what `tools/sweep.py` drives, and
-			// anything else is a display name, which is what a person types.
-			char* end            = nullptr;
-			const long asNumber  = std::strtol( set.first.c_str(), &end, 10 );
-			unsigned int id      = PT_COUNT;
-
-			if( end != nullptr && *end == '\0' && asNumber >= 0 && asNumber < PT_COUNT )
-			{
-				id = static_cast< unsigned int >( asNumber );
-			}
-			else
-			{
-				const auto found = byName.find( set.first );
-				if( found != byName.end() )
-					id = found->second;
-			}
-
-			if( id >= PT_COUNT )
-			{
-				std::fprintf( stderr, "no parameter called '%s'\n", set.first.c_str() );
-				++failures;
-				continue;
-			}
-			plugin.SetFloatParameter( id, set.second );
-		}
+		failures += applySets( plugin, sets );
 
 		GLuint clip = effect ? makeClipTexture( width, height ) : 0;
 
