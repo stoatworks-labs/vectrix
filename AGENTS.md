@@ -188,6 +188,24 @@ a file that does not exist. Hence `sampleA`/`sampleB`, `ClipTexture`, `deposit`,
 for the life of the plugin instance until the host reloads it. Guarded in the
 trace vertex shader **and** clamped in the decay pass. Both, not either.
 
+### `$<TARGET_OBJECTS:>` throws away everything except the objects
+
+The OFX target used to splice `vectrix_core` in as
+`$<TARGET_OBJECTS:vectrix_core>`. That gives you the compiled objects and
+nothing else — no include directories, no compile definitions, none of the
+library's usage requirements. GLEW reaches this plugin through
+`vectrix_core`'s PUBLIC link to `GLEW::GLEW`, so the OFX build failed on Windows
+with `Cannot open include file: 'GL/glew.h'` from inside `FFGL.h`.
+
+Two things made it expensive. **macOS cannot see it at all** — there the SDK
+headers reach the system OpenGL framework and GLEW is never linked — so a
+platform-neutral-looking line was Windows-only. And the two FFGL bundles built
+fine in the same run, because they *link* the core; only the one target that
+spliced it failed, which is the clue if you meet this again.
+
+`target_link_libraries(target PRIVATE vectrix_core)` on an OBJECT library gives
+both the objects and the usage requirements. Use that.
+
 ### `set -o pipefail` plus `grep -q` is a race, and the big binary loses
 
 `tools/verify.sh` runs under `pipefail`. `nm -gU "$bin" | grep -q _OfxGetPlugin`
