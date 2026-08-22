@@ -32,6 +32,11 @@ public:
 	/// SetTime, or a negative number if it never called it.
 	void Update( double hostTime );
 
+	/// Declare the host's unit instead of letting Update infer it. The offline
+	/// harness renders as fast as the GPU allows, so the calibration -- which
+	/// measures host time against real elapsed time -- has nothing to measure.
+	void SetScaleForTest( double scale ) { clockScale = scale; }
+
 	/// Seconds since the plugin started, normalised. Monotonic.
 	double Now() const
 	{
@@ -76,6 +81,9 @@ private:
 	std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 
 	double clockScale   = 0.0; ///< 0 until decided, then 1.0 or 0.001.
+	double lastWallTime = -1.0;
+	int secondsVotes    = 0;
+	int millisVotes     = 0;
 	double lastRawTime  = -1.0;
 	double now          = 0.0;
 	double lastNow      = -1.0;

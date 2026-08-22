@@ -19,6 +19,9 @@ double sampleRateFor( Detail detail )
 	}
 }
 
+/// Frames that must agree before the host's clock unit is settled.
+static constexpr int kClockVotes = 4;
+
 void Clock::Update( double hostTime )
 {
 	double raw;
@@ -42,22 +45,44 @@ void Clock::Update( double hostTime )
 		return;
 	}
 
-	//Decide the unit from the first plausible frame delta, then stop asking.
-	//0.001..0.5 is a seconds host's frame; 2..500 is a milliseconds host's.
-	//Anything outside both is a stall or a scrub and keeps waiting. Until it is
-	//decided we assume seconds; the decision lands within two frames, and the
-	//clamp below absorbs the single mis-scaled step a late decision produces.
-	if( clockScale == 0.0 && lastRawTime >= 0.0 && raw > lastRawTime )
-	{
-		const double d = raw - lastRawTime;
-		if( d >= 0.001 && d <= 0.5 )
-			clockScale = 1.0;
-		else if( d >= 2.0 && d <= 500.0 )
-			clockScale = 0.001;
-	}
-	lastRawTime = raw;
+	//Decide the unit by measuring the host's clock against a real one. The
+	//ratio is ~1 for a seconds host and ~1000 for a milliseconds host, and
+	//nothing plausible sits between, so both bands are wide and a frame that
+	//fits neither simply does not vote. This replaced a guess made from the
+	//magnitude of one frame delta, which decided nothing between 0.5 and 2.0,
+	//could lock to "seconds" off a burst of sub-0.5 ms frames at load, and
+	//assumed seconds while undecided -- precisely the millisecond host's wrong
+	//answer.
+	const double wallNow =
+	    std::chrono::duration< double >( std::chrono::steady_clock::now() - startTime ).count();
 
-	const double scaled = raw * ( clockScale == 0.0 ? 1.0 : clockScale );
+	if( clockScale == 0.0 && lastRawTime >= 0.0 && lastWallTime >= 0.0 )
+	{
+		const double hostDelta = raw - lastRawTime;
+		const double wallDelta = wallNow - lastWallTime;
+
+		//A paused host, a looping clip or a stalled frame tells us nothing.
+		if( hostDelta > 0.0 && wallDelta >= 0.0005 )
+		{
+			const double ratio = hostDelta / wallDelta;
+			if( ratio > 0.1 && ratio < 10.0 )
+				++secondsVotes;
+			else if( ratio > 100.0 && ratio < 10000.0 )
+				++millisVotes;
+
+			//Several frames rather than one, so a single odd frame cannot
+			//decide it alone.
+			if( secondsVotes >= kClockVotes || millisVotes >= kClockVotes )
+				clockScale = millisVotes > secondsVotes ? 0.001 : 1.0;
+		}
+	}
+	lastRawTime  = raw;
+	lastWallTime = wallNow;
+
+	//Until the unit is settled, run on the real clock rather than assume one:
+	//wrong in origin but right in rate, where assuming seconds would be a
+	//thousand times fast on Resolume.
+	const double scaled = clockScale != 0.0 ? raw * clockScale : wallNow;
 
 	//Monotonic on the way out. A host that scrubs backwards hands us a negative
 	//delta; the figure should carry on from where it is rather than unwinding,

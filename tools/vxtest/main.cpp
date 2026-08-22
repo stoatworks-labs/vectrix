@@ -368,6 +368,7 @@ bool renderFrame( VectrixPlugin& plugin, const Target& target, int frameIndex, G
 	// driving it from the frame counter is what stops the picture depending on
 	// how long the process has been alive.
 	const double seconds = static_cast< double >( frameIndex ) * secondsPerFrame;
+	plugin.SetClockScaleForTest( 1.0 );//seconds, said out loud rather than inferred
 	plugin.SetTime( seconds );
 
 	// 120 BPM in 4/4 from time zero, so bar N starts at exactly 2N seconds and

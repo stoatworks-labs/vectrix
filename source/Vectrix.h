@@ -55,6 +55,9 @@ namespace vectrix
 class VectrixPlugin : public CFFGLPlugin
 {
 public:
+	/// Declare the host clock's unit for the offline harness.
+	void SetClockScaleForTest( double scale ) { clock.SetScaleForTest( scale ); }
+
 	explicit VectrixPlugin( bool overInput );
 	~VectrixPlugin() override = default;
 
