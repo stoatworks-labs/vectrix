@@ -100,12 +100,23 @@ jobs:
         #
         # Tools are OFF: vxtest is macOS-only (CGL), and the macOS job above
         # already compiles and runs it.
+        #
+        # The toolchain path MUST stay double-quoted. A `run:` step on Windows
+        # is PowerShell, and unquoted this expanded to nothing — CMake was
+        # handed the literal string `$env:VCPKG_INSTALLATION_ROOT/...` and
+        # failed with "Could not find toolchain file", which reads like a
+        # broken runner image rather than a quoting bug. release.yml had the
+        # quotes and this file did not, which is why releases built and every
+        # pull request went red.
+        #
+        # `-A x64` is here for the same reason: this job only earns its keep if
+        # it configures the way release.yml does.
         run: >
-          cmake -B build
+          cmake -B build -A x64
           -DCMAKE_BUILD_TYPE=Release
           -DVECTRIX_BUILD_TOOLS=OFF
           -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
-          -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         run: cmake --build build --config Release --parallel
