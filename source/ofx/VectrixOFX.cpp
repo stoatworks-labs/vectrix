@@ -1377,7 +1377,7 @@ const Decl kDecls[] = {
 	TOGGLEG( PT_RECT_ON, "rectifier", "Rectifier", 0.0f, "", "Rectifier" ),
 	TOGGLE( PT_RECT_MODE, "fullWave", "Full Wave", 0.0f, "" ),
 	SLIDER( PT_RECT_BIAS, "foldPoint", "Fold Point", 0.5f, "Where the fold happens, -1 to 1." ),
-	OPTION( PT_RECT_ROUTING, "rectRouting", "Rectifier Routing", 1.0f, kRoutingNames, kRoutingCount, "" ),
+	OPTION( PT_RECT_ROUTING, "rectRouting", "Rectify Routing", 1.0f, kRoutingNames, kRoutingCount, "" ),
 
 	//--- Slew --------------------------------------------------------------
 	TOGGLEG( PT_SLEW_ON, "slew", "Slew Limiter", 0.0f,
@@ -1466,7 +1466,7 @@ const Decl kDecls[] = {
 	SLIDER( PT_DELAY_DAMP_HIGH, "delayBassCut", "Delay Bass Cut", 0.41f, "" ),
 	SLIDER( PT_DELAY_MIX, "delayMix", "Delay Mix", 0.4f, "" ),
 	OPTION( PT_DELAY_ROUTING, "delayRouting", "Delay Routing", 0.0f, kRoutingNames, kRoutingCount, "" ),
-	TOGGLE( PT_DELAY_TIME_MODE, "delayCrossfade", "Crossfade Time Changes", 0.0f,
+	TOGGLE( PT_DELAY_TIME_MODE, "delayCrossfade", "Crossfade Time", 0.0f,
 	        "Crossfade rather than repitch when the time changes. A real bucket brigade "
 	        "repitches, which is the default." ),
 
@@ -1599,6 +1599,7 @@ const Decl kDecls[] = {
 	{ PT_ABOUT_BUTTON_1, Kind::Absent, "about1", "", "", 0.0f, 0.0f, 1.0f, nullptr, 0, nullptr },
 	{ PT_ABOUT_BUTTON_2, Kind::Absent, "about2", "", "", 0.0f, 0.0f, 1.0f, nullptr, 0, nullptr },
 	{ PT_ABOUT_BUTTON_3, Kind::Absent, "about3", "", "", 0.0f, 0.0f, 1.0f, nullptr, 0, nullptr },
+	{ PT_ABOUT_BUTTON_4, Kind::Absent, "about4", "", "", 0.0f, 0.0f, 1.0f, nullptr, 0, nullptr },
 };
 
 #undef SLIDER

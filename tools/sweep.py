@@ -54,8 +54,8 @@ FRAMES = 8
 
 # Parameters that cannot or must not be swept, with the reason.
 SKIP = {
-    "Crossfade Time Changes": "only differs while the delay time is CHANGING, "
-                              "and a sweep holds every parameter still",
+    "Crossfade Time": "only differs while the delay time is CHANGING, "
+                      "and a sweep holds every parameter still",
     "Audio": "an FFT buffer the host fills; its float value is meaningless",
     "About": "a display-only text line",
     "User guide": "a button that opens a web browser",
@@ -157,7 +157,7 @@ CONTEXT = {
     "Comp Routing": fx("Compressor", **{"Deflection": 0.9}),
 
     "Rectifier": fx("Rectifier"), "Full Wave": fx("Rectifier"),
-    "Fold Point": fx("Rectifier"), "Rectifier Routing": fx("Rectifier"),
+    "Fold Point": fx("Rectifier"), "Rectify Routing": fx("Rectifier"),
 
     # A slew limit only shows on a signal with somewhere to go quickly.
     "Slew Limiter": fx("Slew Limiter", **{"Wave X": 2, "Wave Y": 2}),

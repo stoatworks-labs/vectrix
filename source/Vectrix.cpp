@@ -280,7 +280,7 @@ void VectrixPlugin::declareParameters()
 	SetParamInfo( PT_RECT_ON, "Rectifier", FF_TYPE_BOOLEAN, false );
 	SetParamInfo( PT_RECT_MODE, "Full Wave", FF_TYPE_BOOLEAN, false );
 	standard( this, PT_RECT_BIAS, "Fold Point" );
-	routingParam( PT_RECT_ROUTING, "Rectifier Routing", 1 );
+	routingParam( PT_RECT_ROUTING, "Rectify Routing", 1 );
 
 	// -- Slew ----------------------------------------------------------------
 	SetParamInfo( PT_SLEW_ON, "Slew Limiter", FF_TYPE_BOOLEAN, false );
@@ -355,7 +355,7 @@ void VectrixPlugin::declareParameters()
 	standard( this, PT_DELAY_DAMP_HIGH, "Delay Bass Cut" );
 	standard( this, PT_DELAY_MIX, "Delay Mix" );
 	routingParam( PT_DELAY_ROUTING, "Delay Routing", 0 );
-	SetParamInfo( PT_DELAY_TIME_MODE, "Crossfade Time Changes", FF_TYPE_BOOLEAN, false );
+	SetParamInfo( PT_DELAY_TIME_MODE, "Crossfade Time", FF_TYPE_BOOLEAN, false );
 
 	// -- Reverb --------------------------------------------------------------
 	SetParamInfo( PT_VERB_ON, "Reverb", FF_TYPE_BOOLEAN, false );
