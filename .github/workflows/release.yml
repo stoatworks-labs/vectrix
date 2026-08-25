@@ -333,8 +333,18 @@ jobs:
     # having run the plugin in Resolve.
     container: rockylinux:8
     steps:
+      # glew and mesa-libGL are installed here where the sibling repos' load
+      # tests need nothing: Vectrix's OpenFX build links GL (see the build job
+      # for why), so libGLEW.so.2 has to be present or dlopen fails outright.
+      #
+      # That is a real deployment requirement of this plugin and not a quirk of
+      # the test: the first run of this job failed with "libGLEW.so.2.0: cannot
+      # open shared object file", which is exactly what a user without GLEW
+      # installed would get. Resolve's Linux box has libGL; it does not
+      # necessarily have GLEW. Documented in the README rather than hidden by
+      # installing it here and saying nothing.
       - name: Toolchain
-        run: dnf -y install gcc unzip findutils bash
+        run: dnf -y install gcc unzip findutils bash glew mesa-libGL
 
       - uses: actions/download-artifact@v8
         with:

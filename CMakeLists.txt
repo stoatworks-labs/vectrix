@@ -275,6 +275,15 @@ if(BUILD_OFX)
         target_link_libraries(VectrixOFX PRIVATE "-framework OpenGL" "-framework AppKit")
     endif()
 
+    # Threads, explicitly. The OFX Support library's multi-thread suite calls
+    # pthread_create, and on Rocky 8 -- glibc 2.28, the floor Resolve supports
+    # -- that still lives in libpthread; libpthread was only folded into libc in
+    # glibc 2.34. Leave it out and the plugin compiles, links, passes a symbol
+    # check and a glibc-version check, and then fails at dlopen with "undefined
+    # symbol: pthread_create". macOS and Windows never show it.
+    find_package(Threads REQUIRED)
+    target_link_libraries(VectrixOFX PRIVATE Threads::Threads)
+
     set(OFX_BUNDLE_DIR "${CMAKE_BINARY_DIR}/Vectrix.ofx.bundle")
     set_target_properties(VectrixOFX PROPERTIES
         PREFIX "" SUFFIX ".ofx" OUTPUT_NAME "Vectrix"
