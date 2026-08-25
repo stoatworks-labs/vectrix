@@ -220,23 +220,25 @@ The same code builds an OpenFX bundle carrying both plugins. Copy
 `C:\Program Files\Common Files\OFX\Plugins` (Windows) or `/usr/OFX/Plugins`
 (Linux).
 
-> **On Linux, install GLEW first or the plugin will not load.** The Trace source
-> is a GPU edge trace, so unlike every other plugin in this fleet the Vectrix
-> `.ofx` links OpenGL: the shipped binary needs `libGLEW.so.2.0`, where its
-> siblings need only libc, libm and libpthread. On Rocky 8 / RHEL 8 the runtime
-> arrives with the devel package, from PowerTools:
+> **On Linux the plugin needs `libGL`, and nothing else unusual.** The Trace
+> source is a GPU edge trace, so unlike every other plugin in this fleet the
+> Vectrix `.ofx` links OpenGL — its siblings need only libc, libm and libpthread.
+> GLEW is linked statically into the binary, so the only thing the machine has to
+> supply is `libGL.so.1`, which is present on anything capable of running Resolve
+> and comes from the base repository on Rocky 8 / RHEL 8 (`mesa-libGL`).
 >
-> ```bash
-> sudo dnf config-manager --set-enabled powertools
-> sudo dnf install glew-devel
-> ```
+> **If you are on v0.1.3, this is not yet true of your build.** That release
+> shipped a `.ofx` that needs `libGLEW.so.2.0` on the machine, which on Rocky 8
+> means enabling PowerTools and installing `glew-devel`. Its release notes carry
+> the commands. Upgrading is the easier fix.
 >
-> This is worth being loud about because of the failure mode: **an OFX host does
-> not report a plugin that failed to load.** Without GLEW, Resolve simply starts
-> with no Vectrix in the effects list and nothing in any log — which reads as a
-> broken download rather than a missing library. The Rocky 8 load test in CI
-> installs GLEW before testing, so that test passing is not by itself evidence
-> that a stock machine will load it.
+> Either way the failure mode is worth knowing, because it is silent: **an OFX
+> host does not report a plugin that failed to load.** Resolve simply starts with
+> no Vectrix in the effects list and nothing in any log, which reads as a broken
+> download rather than a missing library. That is why CI now runs its load test
+> on a stock Rocky 8 with no GL libraries beyond `mesa-libGL` — so that the test
+> passing is evidence about a real machine, rather than about a container
+> prepared to make it pass.
 
 The signal chain is the same code — the engine is linked in, not reimplemented —
 but four things genuinely differ, and they are limitations rather than choices:
