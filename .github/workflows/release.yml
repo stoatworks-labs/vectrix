@@ -346,11 +346,15 @@ jobs:
       - name: Toolchain
         run: |
           dnf -y install gcc unzip findutils bash dnf-plugins-core
-          # glew is not in Rocky 8's base repos -- it lives in PowerTools, the
-          # same place the build container takes glew-devel from. A user who
-          # has to enable an extra repo to load this plugin is itself part of
-          # the finding.
+          # The runtime libGLEW is in neither Rocky 8's base repos NOR
+          # PowerTools -- PowerTools carries only glew-devel, which is what the
+          # build container uses. The shared library itself comes from EPEL.
+          #
+          # Read that as a deployment fact, not a CI detail: a Rocky 8 user
+          # cannot load this plugin without adding a third-party repository
+          # first. See the README for what follows from that.
           dnf config-manager --set-enabled powertools
+          dnf -y install epel-release
           dnf -y install glew mesa-libGL
 
       - uses: actions/download-artifact@v8
