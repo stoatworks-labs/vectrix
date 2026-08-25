@@ -216,9 +216,101 @@ jobs:
           path: installers/*
           if-no-files-found: warn
 
+  linux-ofx:
+    name: linux-x86_64 (OpenFX)
+    runs-on: ubuntu-latest
+    # AlmaLinux 8 rather than the ubuntu image, for glibc 2.28 against 2.39.
+    # Resolve's supported Linux is Rocky 8.6, and a plugin linked against a
+    # newer glibc is refused by the loader there, while anything newer than
+    # Rocky 8 loads a 2.28 build perfectly well.
+    container: almalinux:8
+    steps:
+      # Vectrix is the one plugin in the fleet whose OpenFX build is NOT free of
+      # GL, so it does not get the VECTRIX_BUILD_FFGL=OFF treatment its siblings
+      # have. Engine.h includes signal/sources/Trace.h, Trace is a GPU edge
+      # trace and includes <FFGLSDK.h>, so the SDK headers and GLEW are a real
+      # dependency of VectrixOFX on every platform -- which is why the Windows
+      # OFX build needs GLEW from vcpkg too.
+      #
+      # So: install the real dependency set, configure the whole project, and
+      # build ONLY the VectrixOFX target. The FFGL plugins are configured but
+      # never compiled; nothing here pretends the coupling is not there.
+      - name: Toolchain
+        run: |
+          dnf -y install git cmake zip binutils gcc-toolset-13 dnf-plugins-core
+          dnf config-manager --set-enabled powertools
+          dnf -y install glew-devel mesa-libGL-devel
+          source /opt/rh/gcc-toolset-13/enable
+          gcc --version
+
+      # Submodules, unlike the sibling repos' Linux jobs: the FFGL SDK is
+      # reached at configure time here.
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # Static libstdc++/libgcc: gcc-toolset-13's runtime is not installed on a
+      # stock Rocky or Alma 8, so a dynamically linked build would fail to load
+      # on precisely the machines this targets. GLEW and libGL stay dynamic --
+      # they are the host's to provide, and Resolve's Linux box has them.
+      - name: Configure
+        run: |
+          source /opt/rh/gcc-toolset-13/enable
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DVECTRIX_BUILD_TOOLS=OFF \
+            -DCMAKE_CXX_FLAGS="-static-libstdc++ -static-libgcc"
+
+      - name: Build
+        run: |
+          source /opt/rh/gcc-toolset-13/enable
+          cmake --build build --parallel --target VectrixOFX
+
+      - name: Collect artifact
+        run: |
+          so="build/Vectrix.ofx.bundle/Contents/Linux-x86-64/Vectrix.ofx"
+          test -f "$so"
+
+          # `nm ... | grep -q` SIGPIPEs under `bash -eo pipefail` when grep
+          # FINDS its match, failing the release on a correct binary. Captured
+          # and matched with `case` instead, as the macOS job does.
+          __syms=$( nm -D --defined-only "$so" )
+          case "$__syms" in
+            *OfxGetPlugin*) ;;
+            *) echo "expected OfxGetPlugin, got: $__syms"; exit 1 ;;
+          esac
+
+          # The whole reason for the container, asserted rather than assumed:
+          # the highest glibc symbol version the binary asks for must not be
+          # newer than Rocky 8's 2.28.
+          __glibc=$( objdump -T "$so" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1 )
+          echo "highest glibc requirement: $__glibc"
+          if [ "$( printf '%s\nGLIBC_2.28\n' "$__glibc" | sort -uV | tail -1 )" != "GLIBC_2.28" ]; then
+            echo "$__glibc is newer than Rocky 8 provides"; exit 1
+          fi
+          # Printed, not asserted: libGLEW and libGL ARE expected here, and a
+          # reader of this log should be able to see exactly what the host has
+          # to supply.
+          readelf -d "$so" | grep NEEDED
+
+          mkdir -p "ofxout/Vectrix.ofx.bundle/Contents/Linux-x86-64"
+          cp "$so" "ofxout/Vectrix.ofx.bundle/Contents/Linux-x86-64/Vectrix.ofx"
+          ls -R ofxout
+
+      - name: Archive (zip)
+        run: |
+          cd ofxout
+          zip -r "../vectrix-ofx-linux-x86_64.zip" ./*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vectrix-linux-x86_64
+          path: "*.zip"
+          if-no-files-found: error
+
   release:
     name: Publish release
-    needs: [build, windows-installer]
+    needs: [build, linux-ofx, windows-installer]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
