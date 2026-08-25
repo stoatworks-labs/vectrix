@@ -284,6 +284,24 @@ if(BUILD_OFX)
     find_package(Threads REQUIRED)
     target_link_libraries(VectrixOFX PRIVATE Threads::Threads)
 
+    # libGL, explicitly, on Linux. Vectrix's OFX build links GL at all because
+    # Engine.h reaches Trace.h and Trace is a GPU edge trace over <FFGLSDK.h>.
+    # When GLEW is linked dynamically this dependency is invisible: libGLEW.so
+    # carries its own NEEDED on libGL and the loader follows it. Link GLEW
+    # statically -- which is what the Linux job does, so the plugin stops
+    # demanding a library Rocky 8 users cannot install without enabling
+    # PowerTools -- and nothing pulls libGL in any more. GLEW's static archive
+    # supplies the extension entry points but not core GL, so the plugin then
+    # builds, links, and fails at dlopen with "undefined symbol: glEnable".
+    #
+    # libGL is a fair thing to require where libGLEW was not: it is in Rocky
+    # 8's base repository and is present on any machine capable of running
+    # Resolve at all.
+    if(UNIX AND NOT APPLE)
+        find_package(OpenGL REQUIRED)
+        target_link_libraries(VectrixOFX PRIVATE OpenGL::GL)
+    endif()
+
     set(OFX_BUNDLE_DIR "${CMAKE_BINARY_DIR}/Vectrix.ofx.bundle")
     set_target_properties(VectrixOFX PROPERTIES
         PREFIX "" SUFFIX ".ofx" OUTPUT_NAME "Vectrix"

@@ -383,8 +383,11 @@ jobs:
       # report load failures. With GLEW linked statically the plugin should
       # load on a machine that has never heard of it, so this container is
       # exactly the machine to prove it on.
+      # A stock Rocky 8: no glew, no extra repositories. mesa-libGL is the one
+      # concession and it is a fair one -- base repo, and present on any machine
+      # that can run Resolve. libGLEW was neither.
       - name: Toolchain
-        run: dnf -y install gcc unzip findutils bash
+        run: dnf -y install gcc unzip findutils bash mesa-libGL
 
       - uses: actions/download-artifact@v8
         with:
