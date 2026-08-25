@@ -216,7 +216,27 @@ frame rate in a real host.
 ## OpenFX — Resolve, Vegas, Nuke, Natron
 
 The same code builds an OpenFX bundle carrying both plugins. Copy
-`build/Vectrix.ofx.bundle` to `/Library/OFX/Plugins`.
+`build/Vectrix.ofx.bundle` to `/Library/OFX/Plugins` (macOS),
+`C:\Program Files\Common Files\OFX\Plugins` (Windows) or `/usr/OFX/Plugins`
+(Linux).
+
+> **On Linux, install GLEW first or the plugin will not load.** The Trace source
+> is a GPU edge trace, so unlike every other plugin in this fleet the Vectrix
+> `.ofx` links OpenGL: the shipped binary needs `libGLEW.so.2.0`, where its
+> siblings need only libc, libm and libpthread. On Rocky 8 / RHEL 8 the runtime
+> arrives with the devel package, from PowerTools:
+>
+> ```bash
+> sudo dnf config-manager --set-enabled powertools
+> sudo dnf install glew-devel
+> ```
+>
+> This is worth being loud about because of the failure mode: **an OFX host does
+> not report a plugin that failed to load.** Without GLEW, Resolve simply starts
+> with no Vectrix in the effects list and nothing in any log — which reads as a
+> broken download rather than a missing library. The Rocky 8 load test in CI
+> installs GLEW before testing, so that test passing is not by itself evidence
+> that a stock machine will load it.
 
 The signal chain is the same code — the engine is linked in, not reimplemented —
 but four things genuinely differ, and they are limitations rather than choices:
