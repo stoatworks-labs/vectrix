@@ -260,6 +260,17 @@ jobs:
       # stock Rocky or Alma 8, so a dynamically linked build would fail to load
       # on precisely the machines this targets. GLEW and libGL stay dynamic --
       # they are the host's to provide, and Resolve's Linux box has them.
+      - name: What does glew-devel actually ship
+        run: |
+          ls -l /usr/lib64/libGLEW* || true
+          rpm -ql glew-devel | grep -E '\.(a|so)' || true
+
+      # GLEW_USE_STATIC_LIBS makes CMake's FindGLEW resolve libGLEW.a instead of
+      # the shared object. That is the whole point of this job: shipped
+      # dynamically, the plugin needs libGLEW.so.2 on the user's machine, and on
+      # Rocky 8 there is no way to get it without enabling PowerTools and
+      # installing a -devel package. Statically linked, the only GL thing left
+      # is libGL itself, which any machine running Resolve necessarily has.
       - name: Configure
         run: |
           source /opt/rh/gcc-toolset-13/enable
@@ -267,6 +278,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DVECTRIX_BUILD_TOOLS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DGLEW_USE_STATIC_LIBS=ON \
             -DCMAKE_CXX_FLAGS="-static-libstdc++ -static-libgcc"
 
       - name: Build
@@ -345,8 +357,17 @@ jobs:
       # installing it here and saying nothing.
       - name: Toolchain
         run: |
-          dnf -y install gcc unzip findutils bash dnf-plugins-core
-          # The runtime libGLEW is in neither Rocky 8's base repos NOR
+          dnf -y install gcc unzip findutils bash mesa-libGL
+          # NOTE: glew is deliberately NOT installed here any more. That absence
+          # IS the test. This plugin used to need libGLEW.so.2 on the user's
+          # machine, and on Rocky 8 that meant enabling PowerTools and
+          # installing a -devel package to obtain a runtime library. Now that
+          # GLEW is linked statically, a container with no glew in it is
+          # precisely the machine a user has -- so if this job goes green, the
+          # requirement is genuinely gone rather than merely documented.
+          #
+          # Kept for the record, since it took several goes to establish:
+          # the runtime libGLEW is in neither Rocky 8's base repos NOR
           # PowerTools -- PowerTools carries only glew-devel, which is what the
           # build container uses. The shared library itself comes from EPEL.
           #
