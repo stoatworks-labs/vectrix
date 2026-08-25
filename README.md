@@ -33,7 +33,7 @@ the deflection yoke of a CRT television.
 
 | Build | Download | Size |
 | --- | --- | --- |
-| Universal (Apple Silicon + Intel) · .dmg disk image | [`vectrix-0.1.4-macos-universal.dmg`](https://github.com/stoatworks-labs/vectrix/releases/download/v0.1.4/vectrix-0.1.4-macos-universal.dmg) | 2.4 MB |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`vectrix-0.1.4-macos-universal.dmg`](https://github.com/stoatworks-labs/vectrix/releases/download/v0.1.4/vectrix-0.1.4-macos-universal.dmg) | 2.0 MB |
 | Universal (Apple Silicon + Intel) · .zip archive | [`vectrix-macos-universal.zip`](https://github.com/stoatworks-labs/vectrix/releases/latest/download/vectrix-macos-universal.zip) | 1.8 MB |
 | Universal (Apple Silicon + Intel) · .zip archive (OpenFX — Resolve, Vegas, Nuke) | [`vectrix-ofx-macos-universal.zip`](https://github.com/stoatworks-labs/vectrix/releases/latest/download/vectrix-ofx-macos-universal.zip) | 1.2 MB |
 
