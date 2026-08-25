@@ -354,8 +354,14 @@ jobs:
           # cannot load this plugin without adding a third-party repository
           # first. See the README for what follows from that.
           dnf config-manager --set-enabled powertools
-          dnf -y install epel-release
-          dnf -y install glew mesa-libGL
+          # glew-devel, not glew: PowerTools packages the development side and
+          # pulls the runtime libGLEW in as its dependency. There is no plain
+          # "glew" to install on Rocky 8 -- not in base, not in PowerTools, not
+          # in EPEL, all three tried. This is the same package the build
+          # container uses, so the library under test is the one it was built
+          # against.
+          dnf -y install glew-devel mesa-libGL
+          ldconfig -p | grep -i glew
 
       - uses: actions/download-artifact@v8
         with:
