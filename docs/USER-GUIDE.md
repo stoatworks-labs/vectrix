@@ -155,7 +155,18 @@ resolves more and genuinely costs more.
 
 ## In OpenFX hosts
 
-Copy `Vectrix.ofx.bundle` to `/Library/OFX/Plugins`. The signal chain is the same code — the engine
+Copy `Vectrix.ofx.bundle` to `/Library/OFX/Plugins` (macOS),
+`C:\Program Files\Common Files\OFX\Plugins` (Windows) or `/usr/OFX/Plugins`
+(Linux).
+
+> **On Linux, install GLEW first or the plugin will not load.** Vectrix's trace
+> renderer is on the GPU, so unlike its siblings this `.ofx` links OpenGL and needs
+> `libGLEW.so.2.0` at run time. On Rocky 8 / RHEL 8: `sudo dnf config-manager
+> --set-enabled powertools && sudo dnf install glew-devel`. An OFX host does not
+> report a plugin that fails to load, so without it Resolve simply starts with no
+> Vectrix and no error.
+
+The signal chain is the same code — the engine
 is linked in, not reimplemented — but four things genuinely differ, and they are limitations rather
 than choices:
 
