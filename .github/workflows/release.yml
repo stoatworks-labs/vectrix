@@ -344,7 +344,14 @@ jobs:
       # necessarily have GLEW. Documented in the README rather than hidden by
       # installing it here and saying nothing.
       - name: Toolchain
-        run: dnf -y install gcc unzip findutils bash glew mesa-libGL
+        run: |
+          dnf -y install gcc unzip findutils bash dnf-plugins-core
+          # glew is not in Rocky 8's base repos -- it lives in PowerTools, the
+          # same place the build container takes glew-devel from. A user who
+          # has to enable an extra repo to load this plugin is itself part of
+          # the finding.
+          dnf config-manager --set-enabled powertools
+          dnf -y install glew mesa-libGL
 
       - uses: actions/download-artifact@v8
         with:
