@@ -249,6 +249,13 @@ jobs:
         with:
           submodules: recursive
 
+      # POSITION_INDEPENDENT_CODE is not boilerplate here. The FFGL SDK builds
+      # a static libffgl-sdk.a, and on Linux a non-PIC archive cannot be linked
+      # into a shared module at all: ld rejects it with "relocation R_X86_64_32S
+      # ... can not be used when making a shared object". macOS and Windows
+      # never hit it -- macOS compiles PIC unconditionally and Windows uses a
+      # different relocation model -- so this is a genuinely Linux-only need.
+      #
       # Static libstdc++/libgcc: gcc-toolset-13's runtime is not installed on a
       # stock Rocky or Alma 8, so a dynamically linked build would fail to load
       # on precisely the machines this targets. GLEW and libGL stay dynamic --
@@ -259,6 +266,7 @@ jobs:
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DVECTRIX_BUILD_TOOLS=OFF \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
             -DCMAKE_CXX_FLAGS="-static-libstdc++ -static-libgcc"
 
       - name: Build
