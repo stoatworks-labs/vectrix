@@ -237,7 +237,8 @@ jobs:
       # never compiled; nothing here pretends the coupling is not there.
       - name: Toolchain
         run: |
-          dnf -y install git cmake zip binutils gcc-toolset-13 dnf-plugins-core
+          dnf -y install git cmake zip binutils gcc-toolset-13 dnf-plugins-core \
+            make curl tar libX11-devel libXext-devel libXi-devel
           dnf config-manager --set-enabled powertools
           dnf -y install glew-devel mesa-libGL-devel
           source /opt/rh/gcc-toolset-13/enable
@@ -260,6 +261,27 @@ jobs:
       # stock Rocky or Alma 8, so a dynamically linked build would fail to load
       # on precisely the machines this targets. GLEW and libGL stay dynamic --
       # they are the host's to provide, and Resolve's Linux box has them.
+      # EL8's glew-devel ships ONLY libGLEW.so -- there is no packaged
+      # libGLEW.a anywhere in base, PowerTools or EPEL, so the static library
+      # has to be built. GLEW is small, BSD-licensed and builds with a plain
+      # make; install.all puts headers and both libraries under /usr so the
+      # headers and the archive are the same version, which they would not be
+      # if the 2.2.0 archive were paired with EL8's 2.0.0 headers.
+      - name: Build a static GLEW
+        run: |
+          source /opt/rh/gcc-toolset-13/enable
+          curl -fsSL -o glew.tgz \
+            https://github.com/nigels-com/glew/releases/download/glew-2.2.0/glew-2.2.0.tgz
+          tar xzf glew.tgz
+          make -C glew-2.2.0 SYSTEM=linux GLEW_DEST=/usr -j"$(nproc)" install.all
+          ls -l /usr/lib64/libGLEW.a
+
+      # GLEW_USE_STATIC_LIBS makes CMake's FindGLEW resolve libGLEW.a instead of
+      # the shared object. That is the whole point of this job: shipped
+      # dynamically, the plugin needs libGLEW.so.2 on the user's machine, and on
+      # Rocky 8 there is no way to get it without enabling PowerTools and
+      # installing a -devel package. Statically linked, the only GL thing left
+      # is libGL itself, which any machine running Resolve necessarily has.
       - name: Configure
         run: |
           source /opt/rh/gcc-toolset-13/enable
@@ -267,6 +289,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DVECTRIX_BUILD_TOOLS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DGLEW_USE_STATIC_LIBS=ON \
             -DCMAKE_CXX_FLAGS="-static-libstdc++ -static-libgcc"
 
       - name: Build
@@ -296,10 +319,17 @@ jobs:
           if [ "$( printf '%s\nGLIBC_2.28\n' "$__glibc" | sort -uV | tail -1 )" != "GLIBC_2.28" ]; then
             echo "$__glibc is newer than Rocky 8 provides"; exit 1
           fi
-          # Printed, not asserted: libGLEW and libGL ARE expected here, and a
-          # reader of this log should be able to see exactly what the host has
-          # to supply.
+          # Asserted, not printed. The entire point of linking GLEW statically
+          # is that this plugin stops demanding a library a Rocky 8 user cannot
+          # install without enabling PowerTools and pulling a -devel package.
+          # If libGLEW ever comes back into NEEDED, that regression must fail
+          # the release rather than ship and be discovered by a user seeing no
+          # plugin and no error.
           readelf -d "$so" | grep NEEDED
+          __needed=$( readelf -d "$so" | grep NEEDED )
+          case "$__needed" in
+            *libGLEW*) echo "libGLEW is back in NEEDED -- static link regressed"; exit 1 ;;
+          esac
 
           mkdir -p "ofxout/Vectrix.ofx.bundle/Contents/Linux-x86-64"
           cp "$so" "ofxout/Vectrix.ofx.bundle/Contents/Linux-x86-64/Vectrix.ofx"
@@ -343,25 +373,21 @@ jobs:
       # installed would get. Resolve's Linux box has libGL; it does not
       # necessarily have GLEW. Documented in the README rather than hidden by
       # installing it here and saying nothing.
+      # A STOCK Rocky 8: gcc and the shell tools to run the probe, and nothing
+      # else. No glew, no mesa-libGL, no extra repositories enabled.
+      #
+      # That bareness is the test. This plugin used to need libGLEW.so.2 on the
+      # user's machine, which on Rocky 8 meant enabling PowerTools and
+      # installing a -devel package to obtain a runtime library -- and the
+      # failure a user saw was no plugin and no error, because OFX hosts do not
+      # report load failures. With GLEW linked statically the plugin should
+      # load on a machine that has never heard of it, so this container is
+      # exactly the machine to prove it on.
+      # A stock Rocky 8: no glew, no extra repositories. mesa-libGL is the one
+      # concession and it is a fair one -- base repo, and present on any machine
+      # that can run Resolve. libGLEW was neither.
       - name: Toolchain
-        run: |
-          dnf -y install gcc unzip findutils bash dnf-plugins-core
-          # The runtime libGLEW is in neither Rocky 8's base repos NOR
-          # PowerTools -- PowerTools carries only glew-devel, which is what the
-          # build container uses. The shared library itself comes from EPEL.
-          #
-          # Read that as a deployment fact, not a CI detail: a Rocky 8 user
-          # cannot load this plugin without adding a third-party repository
-          # first. See the README for what follows from that.
-          dnf config-manager --set-enabled powertools
-          # glew-devel, not glew: PowerTools packages the development side and
-          # pulls the runtime libGLEW in as its dependency. There is no plain
-          # "glew" to install on Rocky 8 -- not in base, not in PowerTools, not
-          # in EPEL, all three tried. This is the same package the build
-          # container uses, so the library under test is the one it was built
-          # against.
-          dnf -y install glew-devel mesa-libGL
-          ldconfig -p | grep -i glew
+        run: dnf -y install gcc unzip findutils bash mesa-libGL
 
       - uses: actions/download-artifact@v8
         with:

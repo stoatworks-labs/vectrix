@@ -155,7 +155,23 @@ resolves more and genuinely costs more.
 
 ## In OpenFX hosts
 
-Copy `Vectrix.ofx.bundle` to `/Library/OFX/Plugins`. The signal chain is the same code — the engine
+Copy `Vectrix.ofx.bundle` to `/Library/OFX/Plugins` (macOS),
+`C:\Program Files\Common Files\OFX\Plugins` (Windows) or `/usr/OFX/Plugins`
+(Linux).
+
+> **On Linux the plugin needs `libGL`, and nothing else unusual.** Vectrix's
+> trace renderer runs on the GPU, so unlike its siblings this `.ofx` links
+> OpenGL. GLEW is linked statically into the binary, so all the machine supplies
+> is `libGL.so.1` — present on anything that can run Resolve, and from the base
+> repository on Rocky 8 / RHEL 8 (`mesa-libGL`).
+>
+> **v0.1.3 is the exception:** that build needs `libGLEW.so.2.0`, which on Rocky
+> 8 means enabling PowerTools and installing `glew-devel`. See its release notes.
+>
+> The failure mode is silent either way — an OFX host does not report a plugin
+> that failed to load, so a missing library looks like a broken download.
+
+The signal chain is the same code — the engine
 is linked in, not reimplemented — but four things genuinely differ, and they are limitations rather
 than choices:
 
