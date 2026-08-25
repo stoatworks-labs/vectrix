@@ -298,6 +298,14 @@ if(BUILD_OFX)
     # 8's base repository and is present on any machine capable of running
     # Resolve at all.
     if(UNIX AND NOT APPLE)
+        # LEGACY, deliberately. Left to itself CMake prefers GLVND, and
+        # OpenGL::GL then resolves to libOpenGL.so.0 + libGLX.so.0 -- which ship
+        # in libglvnd-*, NOT in mesa-libGL. The plugin built fine and failed at
+        # dlopen with "libOpenGL.so.0: cannot open shared object file". LEGACY
+        # gives the classic libGL.so.1 soname instead: mesa-libGL provides it
+        # from Rocky 8's base repo, and GLVND systems keep it for compatibility,
+        # so it is the name present on the widest range of hosts.
+        set(OpenGL_GL_PREFERENCE LEGACY)
         find_package(OpenGL REQUIRED)
         target_link_libraries(VectrixOFX PRIVATE OpenGL::GL)
     endif()
