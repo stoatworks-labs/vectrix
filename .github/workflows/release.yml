@@ -373,34 +373,18 @@ jobs:
       # installed would get. Resolve's Linux box has libGL; it does not
       # necessarily have GLEW. Documented in the README rather than hidden by
       # installing it here and saying nothing.
+      # A STOCK Rocky 8: gcc and the shell tools to run the probe, and nothing
+      # else. No glew, no mesa-libGL, no extra repositories enabled.
+      #
+      # That bareness is the test. This plugin used to need libGLEW.so.2 on the
+      # user's machine, which on Rocky 8 meant enabling PowerTools and
+      # installing a -devel package to obtain a runtime library -- and the
+      # failure a user saw was no plugin and no error, because OFX hosts do not
+      # report load failures. With GLEW linked statically the plugin should
+      # load on a machine that has never heard of it, so this container is
+      # exactly the machine to prove it on.
       - name: Toolchain
-        run: |
-          dnf -y install gcc unzip findutils bash mesa-libGL
-          # NOTE: glew is deliberately NOT installed here any more. That absence
-          # IS the test. This plugin used to need libGLEW.so.2 on the user's
-          # machine, and on Rocky 8 that meant enabling PowerTools and
-          # installing a -devel package to obtain a runtime library. Now that
-          # GLEW is linked statically, a container with no glew in it is
-          # precisely the machine a user has -- so if this job goes green, the
-          # requirement is genuinely gone rather than merely documented.
-          #
-          # Kept for the record, since it took several goes to establish:
-          # the runtime libGLEW is in neither Rocky 8's base repos NOR
-          # PowerTools -- PowerTools carries only glew-devel, which is what the
-          # build container uses. The shared library itself comes from EPEL.
-          #
-          # Read that as a deployment fact, not a CI detail: a Rocky 8 user
-          # cannot load this plugin without adding a third-party repository
-          # first. See the README for what follows from that.
-          dnf config-manager --set-enabled powertools
-          # glew-devel, not glew: PowerTools packages the development side and
-          # pulls the runtime libGLEW in as its dependency. There is no plain
-          # "glew" to install on Rocky 8 -- not in base, not in PowerTools, not
-          # in EPEL, all three tried. This is the same package the build
-          # container uses, so the library under test is the one it was built
-          # against.
-          dnf -y install glew-devel mesa-libGL
-          ldconfig -p | grep -i glew
+        run: dnf -y install gcc unzip findutils bash
 
       - uses: actions/download-artifact@v8
         with:
