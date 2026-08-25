@@ -167,7 +167,7 @@ jobs:
           rl_dmg "${{ matrix.name }}" out
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vectrix-${{ matrix.name }}
           path: |
@@ -210,7 +210,7 @@ jobs:
           rl_nsis windows-x86_64 "$stage" --cli
           ls -l installers
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vectrix-windows-installer
           path: installers/*
