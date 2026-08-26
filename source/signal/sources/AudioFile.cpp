@@ -112,16 +112,6 @@ namespace
 
 namespace vectrix
 {
-const char* const kAudioExtensions[] = {
-	"wav", "aiff", "aif", "mp3", "flac", "ogg",
-#if VECTRIX_WITH_OPUS
-	"opus",
-#endif
-};
-
-const int kAudioExtensionCount =
-	static_cast< int >( sizeof( kAudioExtensions ) / sizeof( kAudioExtensions[ 0 ] ) );
-
 namespace
 {
 constexpr double kTwoPi = 6.283185307179586476925286766559;

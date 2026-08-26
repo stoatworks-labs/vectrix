@@ -220,9 +220,14 @@ void VectrixPlugin::declareParameters()
 
 	// -- Audio file ----------------------------------------------------------
 	{
+		//Range-for, not a null-terminator walk: `kAudioExtensions` has never had
+		//a terminator. Walking for one ran off the end into whatever the linker
+		//put next -- zero on macOS, and on MSVC the extension count itself, read
+		//back as a `const char*` of 0x7. See `docs/NOTES.md`.
 		std::vector< std::string > extensions;
-		for( const char* const* e = kAudioExtensions; *e != nullptr; ++e )
-			extensions.emplace_back( *e );
+		extensions.reserve( static_cast< size_t >( kAudioExtensionCount ) );
+		for( const char* e : kAudioExtensions )
+			extensions.emplace_back( e );
 		SetFileParamInfo( PT_FILE, "Audio File", extensions, "" );
 	}
 	standard( this, PT_FILE_RATE, "File Rate" );
