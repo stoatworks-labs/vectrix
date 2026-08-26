@@ -142,6 +142,7 @@ VectrixPlugin::VectrixPlugin( bool over ) : overInput( over )
 		params[ d.id ] = d.value;
 
 	declareParameters();
+	applyVisibility( false );
 
 	diag::init();
 }
@@ -497,6 +498,40 @@ void VectrixPlugin::declareParameters()
 // Parameters
 //---------------------------------------------------------------------------
 
+//---------------------------------------------------------------------------
+void VectrixPlugin::applyVisibility( bool raise )
+{
+	// The five source kinds, and the id run each one owns. Only the selected
+	// kind's controls can reach the picture; the other four are dead weight in
+	// a list that is already 173 entries long.
+	struct Run
+	{
+		SourceKind kind;
+		unsigned int first;
+		unsigned int last;
+	};
+	static const Run kRuns[] = {
+		{ SourceKind::Oscillator, PT_WAVE_X, PT_BLANK_RETRACE },
+		{ SourceKind::Shape, PT_SHAPE, PT_TROCHOID },
+		{ SourceKind::Wireframe, PT_MESH, PT_SCROLL },
+		{ SourceKind::AudioFile, PT_FILE, PT_FILE_SYNC },
+		{ SourceKind::Trace, PT_TRACE_THRESHOLD, PT_TRACE_STROKES },
+	};
+
+	const int current = Option( params[ PT_SOURCE ], kSourceCount );
+
+	for( const Run& run : kRuns )
+	{
+		const bool visible = current == static_cast< int >( run.kind );
+		for( unsigned int id = run.first; id <= run.last; ++id )
+		{
+			SetParamVisibility( id, visible, false );
+			if( raise )
+				RaiseParamEvent( id, FF_EVENT_FLAG_VISIBILITY );
+		}
+	}
+}
+
 FFResult VectrixPlugin::SetFloatParameter( unsigned int index, float value )
 {
 	if( index >= PT_COUNT )
@@ -509,6 +544,12 @@ FFResult VectrixPlugin::SetFloatParameter( unsigned int index, float value )
 		const int chosen = static_cast< int >( std::lround( value ) );
 		if( chosen > 0 )
 			applyPreset( chosen );
+		return FF_SUCCESS;
+	}
+
+	if( index == PT_SOURCE )
+	{
+		applyVisibility( true );
 		return FF_SUCCESS;
 	}
 
