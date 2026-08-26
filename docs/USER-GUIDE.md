@@ -17,9 +17,11 @@ went.**
 > measured line density against `1/v`. Both probe the same shader code that ships, and a control
 > sweep fails if any parameter turns out to do nothing.
 >
-> **Both plugins have been loaded and run in Resolume Arena.** What is still unconfirmed is
-> narrower: whether Arena's input is genuinely premultiplied, and how the Trace source's readback
-> behaves for frame rate in a real host.
+> **Both plugins have been loaded and run in Resolume Arena**, and since v0.1.5 both are also
+> confirmed to load and register in Arena on Windows — which is a thing worth stating plainly,
+> because up to v0.1.4 they did not. What is still unconfirmed is narrower: whether Arena's input
+> is genuinely premultiplied, and how the Trace source's readback behaves for frame rate in a real
+> host.
 >
 > This codebase was created with AI assistance, directed and reviewed by a human author.
 
@@ -202,4 +204,12 @@ P31 against P7 is up to a factor of three.
 **No trail at all on P31.** Also correct, and the reason P7 exists.
 
 **The effect does nothing.** That is what a shader that would not compile looks like from outside.
-Check `~/Library/Logs/vectrix/`.
+Check the log — `~/Library/Logs/vectrix/` on macOS, `%LOCALAPPDATA%\vectrix\logs` on Windows,
+`~/.local/state/vectrix/logs` on Linux.
+
+**Resolume will not start at all on Windows, and deleting the plugin fixes it.** A bug in
+v0.1.0 to v0.1.4 crashed the host while it was scanning the plugin folder — before any frame, and
+before the plugin could write a line to its own log, so there was nothing to look at. **Fixed in
+v0.1.5.** If you are on an earlier build, delete `Vectrix.dll` and `Vectrix Trace.dll` from
+`Documents\Resolume Arena\Extra Effects`, start Resolume to confirm it is happy, then install
+v0.1.5. macOS was never affected.

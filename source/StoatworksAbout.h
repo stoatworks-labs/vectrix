@@ -20,7 +20,7 @@ namespace stoatworks::about
     inline constexpr auto guide = "https://stoatworks-labs.com/software/vectrix/guide/";
     inline constexpr auto page = "https://stoatworks-labs.com/software/vectrix/";
     inline constexpr auto repo = "https://github.com/stoatworks-labs/vectrix";
-    inline constexpr auto versionFallback = "v0.1.4";
+    inline constexpr auto versionFallback = "v0.1.5";
 
     inline constexpr auto org = "Stoatworks Labs";
     inline constexpr auto home = "https://stoatworks-labs.com";
