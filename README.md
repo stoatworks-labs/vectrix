@@ -26,14 +26,14 @@ the deflection yoke of a CRT television.
 
 ## Download
 
-**[v0.1.5](https://github.com/stoatworks-labs/vectrix/releases/tag/v0.1.5)** — prebuilt for macOS, Windows and Linux. Pick your platform:
+**[v0.1.6](https://github.com/stoatworks-labs/vectrix/releases/tag/v0.1.6)** — prebuilt for macOS, Windows and Linux. Pick your platform:
 
 <details>
 <summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
 
 | Build | Download | Size |
 | --- | --- | --- |
-| Universal (Apple Silicon + Intel) · .dmg disk image | [`vectrix-0.1.5-macos-universal.dmg`](https://github.com/stoatworks-labs/vectrix/releases/download/v0.1.5/vectrix-0.1.5-macos-universal.dmg) | 2.0 MB |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`vectrix-0.1.6-macos-universal.dmg`](https://github.com/stoatworks-labs/vectrix/releases/download/v0.1.6/vectrix-0.1.6-macos-universal.dmg) | 2.1 MB |
 | Universal (Apple Silicon + Intel) · .zip archive | [`vectrix-macos-universal.zip`](https://github.com/stoatworks-labs/vectrix/releases/latest/download/vectrix-macos-universal.zip) | 1.9 MB |
 | Universal (Apple Silicon + Intel) · .zip archive (OpenFX — Resolve, Vegas, Nuke) | [`vectrix-ofx-macos-universal.zip`](https://github.com/stoatworks-labs/vectrix/releases/latest/download/vectrix-ofx-macos-universal.zip) | 1.2 MB |
 
@@ -44,8 +44,8 @@ the deflection yoke of a CRT television.
 
 | Build | Download | Size |
 | --- | --- | --- |
-| x64 · .exe installer | [`vectrix-0.1.5-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/vectrix/releases/download/v0.1.5/vectrix-0.1.5-windows-x86_64-setup.exe) | 471 KB |
-| x64 · .zip archive | [`vectrix-windows-x86_64.zip`](https://github.com/stoatworks-labs/vectrix/releases/latest/download/vectrix-windows-x86_64.zip) | 776 KB |
+| x64 · .exe installer | [`vectrix-0.1.6-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/vectrix/releases/download/v0.1.6/vectrix-0.1.6-windows-x86_64-setup.exe) | 467 KB |
+| x64 · .zip archive | [`vectrix-windows-x86_64.zip`](https://github.com/stoatworks-labs/vectrix/releases/latest/download/vectrix-windows-x86_64.zip) | 777 KB |
 | x64 · .zip archive (OpenFX — Resolve, Vegas, Nuke) | [`vectrix-ofx-windows-x86_64.zip`](https://github.com/stoatworks-labs/vectrix/releases/latest/download/vectrix-ofx-windows-x86_64.zip) | 426 KB |
 
 </details>
