@@ -133,6 +133,47 @@ test suite that only ever runs on the developer's platform cannot see undefined
 behaviour that the developer's linker happens to make benign. **Load the shipped
 Windows binary in a real Windows host before releasing it** — that is now cheap.
 
+## 2026-08-26: 173 controls down to 81, and a rule that was the wrong way round
+
+An external user filed "there are soooooo many parameters, it took a while to
+find presets" (#7). Two things came out of chasing it, both measured on the
+win-lab Arena rather than reasoned about.
+
+**Resolume honours `SetParamVisibility`, at runtime.** Nothing in the fleet had
+proved a host acts on it. It does, for every parameter, and it updates the panel
+live when the plugin raises `FF_EVENT_FLAG_VISIBILITY`. So the four source
+groups the current Source cannot reach are now hidden, and each of the thirteen
+pedals shows only its On switch until it is switched on — not one of them
+defaults to on. **173 visible controls become 81**, and switching Delay on
+returns exactly its nine.
+
+The On switch is never hidden. Hiding the control that turns a thing back on
+leaves an operator with no way back, and that is worse than a long list.
+
+**"Never renumber a released id" was wrong, and it had been shaping this repo.**
+A saved composition stores `name`/`value` pairs, and only for parameters that
+differ from their default — not indices. Proved rather than assumed: a
+composition was saved with three marker values, `PT_PRESET` was moved from the
+middle of the list to the end (shifting every Modulation id by one), and
+reloading that composition on the renumbered build put all three values back on
+the right parameters. So Preset now sits in its own group at the bottom, where
+every other plugin in the fleet puts it.
+
+What must never change is a parameter's **name** — a renamed control silently
+loses its saved value, and since only non-defaults are written there is nothing
+in the file to notice it by. The append-only rule still holds for an option's
+elements, which are stored as numbers.
+
+**The afternoon this cost, and why.** The first measurements said 150 rather
+than 81, with some hidden parameters honoured and others not — on what looked
+like a freshly launched Arena. A hypothesis fitted it exactly: Arena hides a
+whole group but shows a partially-hidden one, and the honoured set was precisely
+the four fully-hidden source groups, 7+7+9+4 = 27. It was wrong. Arena reloads
+the last composition at startup, that composition already held a Vectrix clip
+created under the previous layout, and an instance carries the parameter surface
+it was born with. Restarting Arena does not clear it. Mount into a clip that has
+never held the plugin.
+
 Related: [old cathode](https://github.com/stoatworks-labs/old-cathode/blob/main/docs/NOTES.md) (`old-cathode`) (raster CRT — the sibling this is deliberately
 not), [resolume scopes](https://github.com/stoatworks-labs/resolume-scopes/blob/main/docs/NOTES.md) (`resolume-scopes`) (measurement, not synthesis; `ScopeBuffer` and
 `SavedGLState` copied from it), [nib](https://github.com/stoatworks-labs/nib/blob/main/docs/NOTES.md) (`nib`) (edge detection as a *look*;

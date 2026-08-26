@@ -20,9 +20,21 @@ namespace vectrix
 	splits a group in two, or merges two into one, and the result renders as a
 	duplicated group header that reads as a bug.
 
-	**Never renumber a released id.** A saved composition refers to parameters by
-	number, so anything added after v0.1.0 goes on the end, after PT_PRESET, with
-	its own group name.
+	**Renumbering a released id is safe; RENAMING one is not.** This used to say
+	the opposite -- that a saved composition refers to parameters by number, so
+	nothing could ever move. Measured on a real Arena 7.27.1: a composition
+	stores `name`/`value` pairs, and only for the parameters that differ from
+	their default. Proved by moving PT_PRESET from the middle of this list to the
+	end -- which shifts every Modulation id by one -- and reloading a composition
+	saved by the previous build: every value came back on the right parameter.
+
+	So a control may be moved to where it belongs in the panel. What must never
+	change is a parameter's NAME: a renamed control silently loses its saved
+	value, and since only non-defaults are written there is nothing left in the
+	file to notice it by.
+
+	The append-only rule still holds for an OPTION's ELEMENTS, which are stored
+	as numbers. Add a new mode at the end; never insert one.
 */
 enum ParamId : unsigned int
 {
