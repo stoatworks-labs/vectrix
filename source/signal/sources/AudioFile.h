@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -15,8 +16,21 @@ namespace vectrix
 /// `.aiff` because both are in circulation and a file dialogue that filters one
 /// out is indistinguishable, from the operator's side, from a plugin that
 /// cannot read AIFF at all.
-extern const char* const kAudioExtensions[];
-extern const int kAudioExtensionCount;
+///
+/// **A complete `std::array` in the header, deliberately.** It was an `extern
+/// const char* const[]` with a separate count, and the incomplete type meant a
+/// caller could not size it -- so the one caller walked it for a null
+/// terminator the array has never had. That runs off the end into whatever the
+/// linker put next: zero on macOS, and on MSVC the count itself, read back as a
+/// `const char*` of 0x7. Range-for this and the mistake is unavailable.
+inline constexpr const char* const kAudioExtensions[] = {
+	"wav", "aiff", "aif", "mp3", "flac", "ogg",
+#if VECTRIX_WITH_OPUS
+	"opus",
+#endif
+};
+
+inline constexpr int kAudioExtensionCount = static_cast< int >( std::size( kAudioExtensions ) );
 
 /// The most audio the source will hold. Eight minutes covers every piece of
 /// oscilloscope music anybody has actually written and costs 184 MB at 96 kHz
