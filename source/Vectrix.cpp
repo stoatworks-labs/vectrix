@@ -1,8 +1,5 @@
 #include "Vectrix.h"
 
-#include <cstdio>
-#include <cstdlib>
-
 #include "Diag.h"
 #include "Presets.h"
 #include "render/Phosphor.h"
@@ -561,19 +558,12 @@ void VectrixPlugin::applyVisibility( bool raise )
 		{ PT_FLANGE_ON, PT_FLANGE_RATE, PT_FLANGE_ROUTING },
 		{ PT_CHORUS_ON, PT_CHORUS_RATE, PT_CHORUS_MIX },
 		{ PT_DELAY_ON, PT_DELAY_SYNC, PT_DELAY_TIME_MODE },
-		{ PT_VERB_ON, PT_VERB_ON, PT_VERB_MIX },//TEST: whole group, switch included
+		{ PT_VERB_ON, PT_VERB_PREDELAY, PT_VERB_MIX },
 	};
 
 	for( const Pedal& pedal : kPedals )
 		show( pedal.first, pedal.last, params[ pedal.on ] > 0.5f );
 
-	if( const char* dump = std::getenv( "VECTRIX_DUMP_VIS" ) )
-	{
-		(void)dump;
-		for( unsigned int id = 0; id < PT_COUNT; ++id )
-			std::fprintf( stderr, "VIS %u %d %s\n", id,
-			              GetParamVisibility( id ) ? 1 : 0, GetParamName( id ) );
-	}
 }
 
 FFResult VectrixPlugin::SetFloatParameter( unsigned int index, float value )
