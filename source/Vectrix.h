@@ -87,6 +87,15 @@ public:
 
 private:
 	void declareParameters();
+
+	/// Hide the source groups that the current Source cannot reach.
+	///
+	/// SPIKE: is runtime visibility honoured by Resolume? FFGL 2.2 says a
+	/// plugin may change a parameter's visibility and raise
+	/// FF_EVENT_FLAG_VISIBILITY; nothing in this fleet has ever proved a host
+	/// acts on it. Everything else about rationalising this list depends on
+	/// the answer.
+	void applyVisibility( bool raise );
 	void applyPreset( int presetIndex );
 	void updateAudio();
 	BeamGeometry::RenderParams renderParams( const Resolved& resolved, double frameSeconds ) const;

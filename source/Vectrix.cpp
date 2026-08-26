@@ -142,6 +142,7 @@ VectrixPlugin::VectrixPlugin( bool over ) : overInput( over )
 		params[ d.id ] = d.value;
 
 	declareParameters();
+	applyVisibility( false );
 
 	diag::init();
 }
@@ -490,12 +491,80 @@ void VectrixPlugin::declareParameters()
 	SetParamGroup( PT_PHOSPHOR, "Tube" );
 	SetParamGroup( PT_MIX, "Output" );
 	SetParamGroup( PT_AUDIO_FFT, "Modulation" );
+	SetParamGroup( PT_PRESET, "Preset" );
 	SetParamGroup( PT_ABOUT_TEXT, "About" );
 }
 
 //---------------------------------------------------------------------------
 // Parameters
 //---------------------------------------------------------------------------
+
+//---------------------------------------------------------------------------
+void VectrixPlugin::applyVisibility( bool raise )
+{
+	// The five source kinds, and the id run each one owns. Only the selected
+	// kind's controls can reach the picture; the other four are dead weight in
+	// a list that is already 173 entries long.
+	struct Run
+	{
+		SourceKind kind;
+		unsigned int first;
+		unsigned int last;
+	};
+	static const Run kRuns[] = {
+		{ SourceKind::Oscillator, PT_WAVE_X, PT_BLANK_RETRACE },
+		{ SourceKind::Shape, PT_SHAPE, PT_TROCHOID },
+		{ SourceKind::Wireframe, PT_MESH, PT_SCROLL },
+		{ SourceKind::AudioFile, PT_FILE, PT_FILE_SYNC },
+		{ SourceKind::Trace, PT_TRACE_THRESHOLD, PT_TRACE_STROKES },
+	};
+
+	const int current = Option( params[ PT_SOURCE ], kSourceCount );
+
+	auto show = [ & ]( unsigned int first, unsigned int last, bool visible ) {
+		for( unsigned int id = first; id <= last; ++id )
+		{
+			SetParamVisibility( id, visible, false );
+			if( raise )
+				RaiseParamEvent( id, FF_EVENT_FLAG_VISIBILITY );
+		}
+	};
+
+	for( const Run& run : kRuns )
+		show( run.first, run.last, current == static_cast< int >( run.kind ) );
+
+	// The pedals. Each keeps its On switch and hides everything else until it
+	// is switched on -- 70 of the 173 parameters in the shipped default state,
+	// because not one pedal defaults to on. The switch itself must never hide,
+	// or there is no way back.
+	//
+	// `first` is the id AFTER the On switch, so the switch is outside the run.
+	struct Pedal
+	{
+		unsigned int on;
+		unsigned int first;
+		unsigned int last;
+	};
+	static const Pedal kPedals[] = {
+		{ PT_VCA_ON, PT_VCA_LEVEL, PT_VCA_ROUTING },
+		{ PT_GATE_ON, PT_GATE_THRESHOLD, PT_GATE_MODE },
+		{ PT_COMP_ON, PT_COMP_THRESHOLD, PT_COMP_ROUTING },
+		{ PT_RECT_ON, PT_RECT_MODE, PT_RECT_ROUTING },
+		{ PT_SLEW_ON, PT_SLEW_RISE, PT_SLEW_ROUTING },
+		{ PT_DRIVE_ON, PT_DRIVE_AMOUNT, PT_DRIVE_ROUTING },
+		{ PT_RING_ON, PT_RING_FREQ, PT_RING_ROUTING },
+		{ PT_CRUSH_ON, PT_CRUSH_BITS, PT_CRUSH_ROUTING },
+		{ PT_PHASE_ON, PT_PHASE_STAGES, PT_PHASE_ROUTING },
+		{ PT_FLANGE_ON, PT_FLANGE_RATE, PT_FLANGE_ROUTING },
+		{ PT_CHORUS_ON, PT_CHORUS_RATE, PT_CHORUS_MIX },
+		{ PT_DELAY_ON, PT_DELAY_SYNC, PT_DELAY_TIME_MODE },
+		{ PT_VERB_ON, PT_VERB_PREDELAY, PT_VERB_MIX },
+	};
+
+	for( const Pedal& pedal : kPedals )
+		show( pedal.first, pedal.last, params[ pedal.on ] > 0.5f );
+
+}
 
 FFResult VectrixPlugin::SetFloatParameter( unsigned int index, float value )
 {
@@ -510,6 +579,18 @@ FFResult VectrixPlugin::SetFloatParameter( unsigned int index, float value )
 		if( chosen > 0 )
 			applyPreset( chosen );
 		return FF_SUCCESS;
+	}
+
+	//Source and the pedal switches decide what the host is even shown.
+	if( index == PT_SOURCE || index == PT_VCA_ON || index == PT_GATE_ON
+	    || index == PT_COMP_ON || index == PT_RECT_ON || index == PT_SLEW_ON
+	    || index == PT_DRIVE_ON || index == PT_RING_ON || index == PT_CRUSH_ON
+	    || index == PT_PHASE_ON || index == PT_FLANGE_ON || index == PT_CHORUS_ON
+	    || index == PT_DELAY_ON || index == PT_VERB_ON )
+	{
+		applyVisibility( true );
+		if( index == PT_SOURCE )
+			return FF_SUCCESS;
 	}
 
 	if( index == PT_RESET && value > 0.5f )

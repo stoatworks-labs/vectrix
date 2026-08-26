@@ -20,9 +20,21 @@ namespace vectrix
 	splits a group in two, or merges two into one, and the result renders as a
 	duplicated group header that reads as a bug.
 
-	**Never renumber a released id.** A saved composition refers to parameters by
-	number, so anything added after v0.1.0 goes on the end, after PT_PRESET, with
-	its own group name.
+	**Renumbering a released id is safe; RENAMING one is not.** This used to say
+	the opposite -- that a saved composition refers to parameters by number, so
+	nothing could ever move. Measured on a real Arena 7.27.1: a composition
+	stores `name`/`value` pairs, and only for the parameters that differ from
+	their default. Proved by moving PT_PRESET from the middle of this list to the
+	end -- which shifts every Modulation id by one -- and reloading a composition
+	saved by the previous build: every value came back on the right parameter.
+
+	So a control may be moved to where it belongs in the panel. What must never
+	change is a parameter's NAME: a renamed control silently loses its saved
+	value, and since only non-defaults are written there is nothing left in the
+	file to notice it by.
+
+	The append-only rule still holds for an OPTION's ELEMENTS, which are stored
+	as numbers. Add a new mode at the end; never insert one.
 */
 enum ParamId : unsigned int
 {
@@ -230,7 +242,6 @@ enum ParamId : unsigned int
 
 	// -- Output --------------------------------------------------------------
 	PT_MIX,
-	PT_PRESET,
 
 	// -- Modulation (appended: its own group, per the fleet's append rule) ----
 	PT_AUDIO_FFT,
@@ -250,6 +261,14 @@ enum ParamId : unsigned int
 	PT_MOD4_TARGET,
 	PT_MOD4_AMOUNT,
 	PT_MOD4_BAND,
+
+	// -- Preset --------------------------------------------------------------
+	//
+	// Last, and its own group, so it is where every other plugin in the fleet
+	// puts it. It used to sit inside Output with the seventeen Modulation
+	// controls after it, which is a long way to scroll for the control most
+	// likely to be wanted first (#7).
+	PT_PRESET,
 
 	// -- The Stoatworks About block ------------------------------------------
 	//
