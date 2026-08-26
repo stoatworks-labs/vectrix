@@ -92,6 +92,47 @@ configures the way release.yml does. Verified green on the real Windows runner.
 **All 22 other Resolume repos already quote it** — vectrix's `ci.yml` was the
 only one, so this is not a fleet sweep.
 
+## 2026-08-26: the plugin took Resolume down on every Windows start (#5)
+
+`kAudioExtensions` has **no null terminator** — `kAudioExtensionCount` bounds it,
+and that constant was used nowhere in the repo. The one place that read the
+array, building the file parameter's extension list, walked it for a terminator
+instead:
+
+    for( const char* const* e = kAudioExtensions; *e != nullptr; ++e )
+
+So the loop ran off the end and read whatever the linker put next. **On macOS
+that was zero and it stopped by luck**, which is why 21/21 in `verify.sh`, 152
+swept controls and every offline check passed on a plugin that could not start
+its host. MSVC lays `kAudioExtensionCount` immediately after the array, so on
+Windows the walk read the integer **7**, constructed `std::string` from
+`(const char*)7`, and took `0xc0000005` reading address `0x7` in `ucrtbase`.
+
+It happens in `declareParameters()`, **before `diag::init()`** — so during
+Resolume's plugin scan, before a frame, with **no vectrix log written at all**.
+The user sees Arena die at startup, every time, with
+
+    ra::WinPluginInstance::load: Loading plugin '...\Vectrix Trace.dll'
+
+as the last line of Resolume's own log, and no way back except deleting the DLL.
+
+**Reproduced on [arena on winlab](https://github.com/stoatworks-labs/fleet-notes/blob/main/notes/reference_arena_on_winlab.md), which is what made it a bug and not a
+driver story** — that box is llvmpipe with no GPU, and the reporter was on an
+RTX 4070. Same crash on both. The minidump named the faulting module and the
+address, and `"Retrace Speed"` — the parameter declared immediately before the
+audio block — was still on the stack, which brackets the fault to four lines.
+
+The array is now a complete `constexpr` type in the header and the call site
+range-fors it, so the idiom is unavailable to write again.
+
+**Not a fleet sweep** — grepping all 39 Resolume repos for the null-walk pattern
+returns this site and nothing else.
+
+Lesson worth keeping, and it is the sharper form of the `sweep.py` one above: a
+test suite that only ever runs on the developer's platform cannot see undefined
+behaviour that the developer's linker happens to make benign. **Load the shipped
+Windows binary in a real Windows host before releasing it** — that is now cheap.
+
 Related: [old cathode](https://github.com/stoatworks-labs/old-cathode/blob/main/docs/NOTES.md) (`old-cathode`) (raster CRT — the sibling this is deliberately
 not), [resolume scopes](https://github.com/stoatworks-labs/resolume-scopes/blob/main/docs/NOTES.md) (`resolume-scopes`) (measurement, not synthesis; `ScopeBuffer` and
 `SavedGLState` copied from it), [nib](https://github.com/stoatworks-labs/nib/blob/main/docs/NOTES.md) (`nib`) (edge detection as a *look*;
