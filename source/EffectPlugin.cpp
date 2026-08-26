@@ -32,7 +32,7 @@ static CFFGLPluginInfo PluginInfo(
 	0,                                                    // Plugin major version number
 	1,                                                    // Plugin minor version number
 	FF_EFFECT,                                            // Plugin type
-	"Vector CRT: draw the clip, or trace it with the beam",// Plugin description
+	"The clip below, painted on the tube face - or traced by the beam.\n\nIn Project the clip is the light behind the glass, so it curves with the face, sits behind the graticule and shares the halation. Set Source to Trace instead and the beam walks the clip's edges, drawing it as a vector figure.\n\nHonest expectation for Trace: excellent on titles, logos and line art; a scribble on real footage. That is the problem, not a setting.\n\nOnly the controls that can currently do something are shown.",// Plugin description
 	"Vectrix FFGL effect"                                 // About
 );
 
