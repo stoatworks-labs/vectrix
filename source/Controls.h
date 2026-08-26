@@ -230,7 +230,6 @@ enum ParamId : unsigned int
 
 	// -- Output --------------------------------------------------------------
 	PT_MIX,
-	PT_PRESET,
 
 	// -- Modulation (appended: its own group, per the fleet's append rule) ----
 	PT_AUDIO_FFT,
@@ -250,6 +249,14 @@ enum ParamId : unsigned int
 	PT_MOD4_TARGET,
 	PT_MOD4_AMOUNT,
 	PT_MOD4_BAND,
+
+	// -- Preset --------------------------------------------------------------
+	//
+	// Last, and its own group, so it is where every other plugin in the fleet
+	// puts it. It used to sit inside Output with the seventeen Modulation
+	// controls after it, which is a long way to scroll for the control most
+	// likely to be wanted first (#7).
+	PT_PRESET,
 
 	// -- The Stoatworks About block ------------------------------------------
 	//
