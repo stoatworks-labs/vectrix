@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Vectrix VERSION 0.1.6 LANGUAGES C CXX)
+project(Vectrix VERSION 0.1.7 LANGUAGES C CXX)
 
 #-----------------------------------------------------------------------------
 # Architecture. Must sit immediately after project() and before any target
