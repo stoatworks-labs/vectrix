@@ -44,11 +44,19 @@ Both declare the same parameters, so a composition can be moved between them.
 
 ## Start from a preset
 
-There are about a hundred and fifty controls in sixteen groups. That is a lot, and cutting them is
-not the answer, because **the effect parameters *are* the plugin**.
+**Preset is the last group in the list**, at the bottom of the panel. From v0.1.6 it is its own
+section rather than being tucked inside Output.
 
 **Each preset is a whole machine rather than a set of slider positions**, so turning one knob on it
 does something you can predict. Start there and go outward.
+
+There are a hundred and seventy-odd controls in the plugin, and cutting them is not the answer —
+**the effect parameters *are* the plugin**. What v0.1.6 does instead is show you only the ones that
+can currently do something: about eighty. The Source you have chosen shows its own controls and not
+the other four sources', and each of the thirteen pedals shows only its on/off switch until you
+switch it on, at which point its knobs appear. Turn Delay on and nine controls arrive with it.
+
+**Every pedal's switch is always visible**, so there is never a state you cannot get out of.
 
 ---
 
