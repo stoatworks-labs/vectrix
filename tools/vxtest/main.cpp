@@ -1943,6 +1943,14 @@ int listParameters()
 		const RangeStruct range = plugin.GetParamRange( id );
 		if( range.min != range.max )
 			std::printf( "   [%g .. %g]", range.min, range.max );
+
+		// What the host is told the value MEANS. Printing it here is the only
+		// way to see the display strings without a host, and it keeps this
+		// listing honest: it showed 0.7700 for controls the plugin knows the
+		// real units of.
+		const char* shown = plugin.GetParameterDisplay( id );
+		if( shown != nullptr && *shown != '\0' )
+			std::printf( "   %s", shown );
 		std::printf( "\n" );
 	}
 

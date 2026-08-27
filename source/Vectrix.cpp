@@ -1,5 +1,7 @@
 #include "Vectrix.h"
 
+#include <cstdio>
+
 #include "Diag.h"
 #include "Presets.h"
 #include "render/Phosphor.h"
@@ -564,6 +566,153 @@ void VectrixPlugin::applyVisibility( bool raise )
 	for( const Pedal& pedal : kPedals )
 		show( pedal.first, pedal.last, params[ pedal.on ] > 0.5f );
 
+}
+
+//---------------------------------------------------------------------------
+/// The value with no unit attached: what a control with no physical meaning
+/// should read, and the fallback before the first frame has been rendered.
+char* VectrixPlugin::PlainDisplay( unsigned int index )
+{
+	const unsigned int type = GetParamType( index );
+	if( type == FF_TYPE_TEXT || type == FF_TYPE_FILE )
+		return GetTextParameter( index );
+
+	char buffer[ 32 ] = {};
+	std::snprintf( buffer, sizeof( buffer ), "%.4f", GetFloatParameter( index ) );
+	displayValue = buffer;
+	return displayValue.data();
+}
+
+//---------------------------------------------------------------------------
+char* VectrixPlugin::GetParameterDisplay( unsigned int index )
+{
+	// Decide whether this control has a unit BEFORE resolving anything.
+	//
+	// Resolve() reads the modulation state and the transport, and the host asks
+	// for a display value at times when neither has been set up -- a plugin is
+	// constructed and interrogated before it is ever given a clock. Resolving
+	// unconditionally at the top of this function segfaulted on the first
+	// parameter queried, which is an option and does not need a unit at all.
+	switch( index )
+	{
+	case PT_REFRESH:
+	case PT_GATE_THRESHOLD:
+	case PT_GATE_ATTACK:
+	case PT_GATE_HOLD:
+	case PT_GATE_RELEASE:
+	case PT_COMP_THRESHOLD:
+	case PT_COMP_RATIO:
+	case PT_COMP_KNEE:
+	case PT_COMP_ATTACK:
+	case PT_COMP_RELEASE:
+	case PT_COMP_MAKEUP:
+	case PT_COMP_CEILING:
+	case PT_DRIVE_AMOUNT:
+	case PT_RING_FREQ:
+	case PT_CRUSH_RATE:
+	case PT_FLANGE_DELAY:
+	case PT_CHORUS_DELAY:
+	case PT_DELAY_TIME:
+	case PT_DELAY_DAMP_LOW:
+	case PT_DELAY_DAMP_HIGH:
+	case PT_VERB_PREDELAY:
+		break;
+	default:
+		// Options already show their element name, and a bare 0..1 is the
+		// honest display for a control with no physical unit.
+		//
+		// ☠️ Answered here rather than by calling the base class, which
+		// dereferences `m_pPlugin` -- a pointer only the host's factory ever
+		// sets. Delegating segfaults the moment anything constructs the plugin
+		// directly, which `vxtest` does, and which is the only way to see these
+		// strings without a host.
+		return PlainDisplay( index );
+	}
+
+	// Read the value the engine is actually running on. Not a recomputation: a
+	// display that re-derives its own number is a second copy of the mapping,
+	// and the two drift the first time somebody changes a range.
+	//Resolved here rather than read from the last rendered frame. Arena asks for
+	//the display string as it applies a new value, BEFORE that value has reached
+	//the render thread, so a cache filled during ProcessOpenGL always shows the
+	//previous setting -- drag Refresh Rate to 64 Hz and the panel says 24. A
+	//neutral Modulation, not the live one, because the panel is reporting what
+	//the control is SET to; feeding it audio would make the number jitter with
+	//the music and would read a member the render thread is writing.
+	const Resolved resolved = Resolve( params, Modulation(), static_cast< double >( bpm ) );
+
+	char buffer[ 64 ] = {};
+	switch( index )
+	{
+	case PT_REFRESH:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f Hz", resolved.walker.refreshHz );
+		break;
+	case PT_GATE_THRESHOLD:
+		std::snprintf( buffer, sizeof( buffer ), "%.1f dB", resolved.chain.gate.thresholdDb );
+		break;
+	case PT_GATE_ATTACK:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.gate.attackMs );
+		break;
+	case PT_GATE_HOLD:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.gate.holdMs );
+		break;
+	case PT_GATE_RELEASE:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.gate.releaseMs );
+		break;
+	case PT_COMP_THRESHOLD:
+		std::snprintf( buffer, sizeof( buffer ), "%.1f dB", resolved.chain.compressor.thresholdDb );
+		break;
+	case PT_COMP_RATIO:
+		std::snprintf( buffer, sizeof( buffer ), "%.1f:1", resolved.chain.compressor.ratio );
+		break;
+	case PT_COMP_KNEE:
+		std::snprintf( buffer, sizeof( buffer ), "%.1f dB", resolved.chain.compressor.kneeDb );
+		break;
+	case PT_COMP_ATTACK:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.compressor.attackMs );
+		break;
+	case PT_COMP_RELEASE:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.compressor.releaseMs );
+		break;
+	case PT_COMP_MAKEUP:
+		std::snprintf( buffer, sizeof( buffer ), "%.1f dB", resolved.chain.compressor.makeupDb );
+		break;
+	case PT_COMP_CEILING:
+		std::snprintf( buffer, sizeof( buffer ), "%.1f dB", resolved.chain.compressor.ceilingDb );
+		break;
+	case PT_DRIVE_AMOUNT:
+		std::snprintf( buffer, sizeof( buffer ), "%.1f dB", resolved.chain.drive.driveDb );
+		break;
+	case PT_RING_FREQ:
+		std::snprintf( buffer, sizeof( buffer ), "%.1f Hz", resolved.chain.ringMod.freq );
+		break;
+	case PT_CRUSH_RATE:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f Hz", resolved.chain.bitcrush.rateHz );
+		break;
+	case PT_FLANGE_DELAY:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.flanger.delayMs );
+		break;
+	case PT_CHORUS_DELAY:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.chorus.delayMs );
+		break;
+	case PT_DELAY_TIME:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.delay.timeMs );
+		break;
+	case PT_DELAY_DAMP_LOW:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f Hz", resolved.chain.delay.dampLowHz );
+		break;
+	case PT_DELAY_DAMP_HIGH:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f Hz", resolved.chain.delay.dampHighHz );
+		break;
+	case PT_VERB_PREDELAY:
+		std::snprintf( buffer, sizeof( buffer ), "%.0f ms", resolved.chain.reverb.preDelayMs );
+		break;
+	default:
+		return PlainDisplay( index );
+	}
+
+	displayValue = buffer;
+	return displayValue.data();
 }
 
 FFResult VectrixPlugin::SetFloatParameter( unsigned int index, float value )
