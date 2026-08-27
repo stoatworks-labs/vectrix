@@ -632,9 +632,14 @@ char* VectrixPlugin::GetParameterDisplay( unsigned int index )
 	// Read the value the engine is actually running on. Not a recomputation: a
 	// display that re-derives its own number is a second copy of the mapping,
 	// and the two drift the first time somebody changes a range.
-	if( !haveResolved )
-		return PlainDisplay( index );
-	const Resolved& resolved = lastResolved;
+	//Resolved here rather than read from the last rendered frame. Arena asks for
+	//the display string as it applies a new value, BEFORE that value has reached
+	//the render thread, so a cache filled during ProcessOpenGL always shows the
+	//previous setting -- drag Refresh Rate to 64 Hz and the panel says 24. A
+	//neutral Modulation, not the live one, because the panel is reporting what
+	//the control is SET to; feeding it audio would make the number jitter with
+	//the music and would read a member the render thread is writing.
+	const Resolved resolved = Resolve( params, Modulation(), static_cast< double >( bpm ) );
 
 	char buffer[ 64 ] = {};
 	switch( index )
@@ -1026,11 +1031,6 @@ FFResult VectrixPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 
 	const Resolved resolved = Resolve( params, modulation, static_cast< double >( bpm ) );
 	engine.SetParams( resolved );
-
-	//Kept for GetParameterDisplay, so the panel's units are the ones the engine
-	//is actually running on rather than a second derivation of them.
-	lastResolved = resolved;
-	haveResolved = true;
 
 	if( contentDirty )
 	{

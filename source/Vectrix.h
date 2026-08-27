@@ -136,18 +136,6 @@ private:
 	/// pointer and reads it after we return.
 	std::string displayValue;
 
-	/// The last settings the engine was actually driven with, kept so that
-	/// GetParameterDisplay can report real units without recomputing them.
-	///
-	/// Calling Resolve() from the display path directly does not work: it reads
-	/// the modulation state and the transport, and the host asks for display
-	/// values on a plugin that has never rendered a frame. Doing so segfaults.
-	/// Reading back what the render path already produced costs nothing, cannot
-	/// drift from the maths, and is simply absent until the first frame -- at
-	/// which point the base class's plain number is the honest answer anyway.
-	Resolved lastResolved;
-	bool haveResolved = false;
-
 	/// The host is handed a bare pointer for the About block, so the string has
 	/// to outlive the call that built it.
 	std::string aboutText;
