@@ -58,6 +58,13 @@ switch it on, at which point its knobs appear. Turn Delay on and nine controls a
 
 **Every pedal's switch is always visible**, so there is never a state you cannot get out of.
 
+**From v0.1.8 the controls that stand for a real quantity say so.** Refresh Rate reads `64 Hz`
+rather than `0.8`, Delay Time reads `239 ms`, Gate Threshold reads `-40.2 dB`. Twenty-one controls
+do this — the ones that were always a frequency, a time or a level underneath, and were only ever
+shown as a fraction because that is what the host asks a plugin for. Nothing about the sound or the
+picture changed; you can now see what you are setting. Controls that are genuinely a proportion,
+like Retrace Speed, still read as one.
+
 ---
 
 ## Why brightness follows dwell time

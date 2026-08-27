@@ -256,6 +256,30 @@ a frame-rate collapse that starts *after* the signal stops — which reads as a
 leak rather than as an FPU stall. Every feedback path goes through
 `vectrix::flush`. This has not been tested on an Intel Mac.
 
+### `GetParameterDisplay` must resolve on demand, never from a cache
+
+`GetParameterDisplay` calls `Resolve()` on every query. That looks wasteful next
+to reading back what the render path already computed, and the wasteful version
+is wrong twice over:
+
+- **Arena asks as it applies a new value**, before that value reaches the render
+  thread. A cache filled in `ProcessOpenGL` therefore always reports the
+  *previous* setting — Refresh Rate dragged to 64 Hz sat in the panel reading
+  24 Hz, which looks like a broken mapping rather than a stale read.
+- **Arena asks before the first frame**, when it first draws the panel. Anything
+  gated on having rendered shows raw `0..1` until the control is touched.
+
+`Resolve()` is pure float maths over `params`; it is safe off the render thread
+and costs nothing. It is fed a **neutral** `Modulation()` deliberately: the panel
+reports what a control is *set* to, so the number does not jitter with the audio,
+and the render thread stays the only reader of the live modulation state.
+
+### Never call `CFFGLPlugin::GetParameterDisplay` as a fallback
+
+The base implementation dereferences `m_pPlugin`, which is null outside a host,
+so `vxtest --list` segfaults on it. `PlainDisplay()` exists to be the fallback
+and is deliberately self-contained.
+
 ---
 
 ## Relationship to the three siblings it sounds like
