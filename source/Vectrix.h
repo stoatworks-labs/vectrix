@@ -67,6 +67,21 @@ public:
 
 	FFResult SetFloatParameter( unsigned int index, float value ) override;
 	float GetFloatParameter( unsigned int index ) override;
+
+	/// What a control's value MEANS, in the units it is really in.
+	///
+	/// Resolume shows this instead of the raw 0..1, and FFGL offers no other
+	/// per-parameter text -- there is no tooltip opcode, so this is the only
+	/// place a control can explain itself. Asked for from the outside (#8).
+	///
+	/// Every number here is read back off `Resolve()`, the same call the engine
+	/// is driven from, rather than recomputed. That is deliberate: a display
+	/// that re-derives its own value is a second copy of the mapping, and the
+	/// two drift the first time somebody changes a range.
+	char* GetParameterDisplay( unsigned int index ) override;
+
+	/// The value with no unit, and the fallback before the first frame.
+	char* PlainDisplay( unsigned int index );
 	FFResult SetTextParameter( unsigned int index, const char* value ) override;
 	char* GetTextParameter( unsigned int index ) override;
 	FFResult SetTime( double time ) override;
@@ -116,6 +131,22 @@ private:
 	mutable std::mutex textMutex;
 	std::string filePath;
 	char textReturn[ 4096 ] = {};
+
+	/// Likewise for a parameter's display value: the host is handed a bare
+	/// pointer and reads it after we return.
+	std::string displayValue;
+
+	/// The last settings the engine was actually driven with, kept so that
+	/// GetParameterDisplay can report real units without recomputing them.
+	///
+	/// Calling Resolve() from the display path directly does not work: it reads
+	/// the modulation state and the transport, and the host asks for display
+	/// values on a plugin that has never rendered a frame. Doing so segfaults.
+	/// Reading back what the render path already produced costs nothing, cannot
+	/// drift from the maths, and is simply absent until the first frame -- at
+	/// which point the base class's plain number is the honest answer anyway.
+	Resolved lastResolved;
+	bool haveResolved = false;
 
 	/// The host is handed a bare pointer for the About block, so the string has
 	/// to outlive the call that built it.
