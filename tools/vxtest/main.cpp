@@ -1910,6 +1910,101 @@ int checkDrift()
 }
 
 //---------------------------------------------------------------------------
+// --names
+//---------------------------------------------------------------------------
+/// Names and display strings fit the sixteen characters FFGL allows.
+///
+/// FFGL truncates a parameter NAME at 16 characters, and the same limit applies
+/// to the DISPLAY string: FF_GET_PARAMETER_DISPLAY hands the host a 16-byte
+/// buffer, and the SDK's own default writes into `static char
+/// s_DisplayValue[ 16 ]`. Both truncations happen in the HOST, silently.
+/// Nothing plugin-side ever notices -- this plugin's buffer is 64, snprintf
+/// succeeds, and `--list` happily prints the whole string. So it ships, and an
+/// operator sees half a word. That is cogwheel #5, where nine display strings
+/// were over the limit and only the one that cut mid-word got reported.
+///
+/// v0.1.8 gave this plugin twenty-one real-unit displays (Hz, dB, ms, ratios)
+/// and no check that any of them fit. This is that check.
+///
+/// A display string is a function of the VALUES, not of the parameter, so it
+/// has to be swept rather than read once at the defaults -- and because
+/// Resolve() reads the whole params[] array, every parameter's display is read
+/// again at every step of every other parameter's sweep.
+int checkNames( bool overInput )
+{
+	VectrixPlugin plugin( overInput );
+	const char* which = overInput ? "effect" : "source";
+
+	int over = 0;
+
+	for( unsigned int id = 0; id < PT_COUNT; ++id )
+	{
+		const char* name = plugin.GetParamName( id );
+		if( name == nullptr )
+			continue;
+		const size_t length = std::strlen( name );
+		if( length > 16 )
+		{
+			std::printf( "  %-8s name     %-3u  %-28s %zu\n", which, id, name, length );
+			++over;
+		}
+	}
+
+	std::vector< float > defaults( PT_COUNT );
+	for( unsigned int id = 0; id < PT_COUNT; ++id )
+		defaults[ id ] = plugin.GetFloatParameter( id );
+
+	// Keyed by PARAMETER, holding its widest offender. Keying by the rendered
+	// string instead reports one row per numeric value, which is a screenful of
+	// rows for what is really one broken format.
+	std::map< unsigned int, std::string > tooLong;
+
+	// Strictly below PT_ABOUT_TEXT. The About buttons OPEN A WEB BROWSER when
+	// their value is set -- a sweep would do it a few hundred times.
+	for( unsigned int swept = 0; swept < PT_ABOUT_TEXT; ++swept )
+	{
+		for( int step = 0; step <= 100; ++step )
+		{
+			plugin.SetFloatParameter( swept, static_cast< float >( step ) / 100.0f );
+
+			for( unsigned int id = 0; id < PT_ABOUT_TEXT; ++id )
+			{
+				const char* display = plugin.GetParameterDisplay( id );
+				if( display == nullptr )
+					continue;
+
+				const size_t length = std::strlen( display );
+				if( length > 16 && length > tooLong[ id ].size() )
+					tooLong[ id ] = display;
+			}
+		}
+		plugin.SetFloatParameter( swept, defaults[ swept ] );
+	}
+
+	for( const auto& entry : tooLong )
+	{
+		const char* name = plugin.GetParamName( entry.first );
+		std::printf( "  %-8s display  %-3u  %-18s %-24s %zu\n", which, entry.first,
+		             name ? name : "", entry.second.c_str(), entry.second.size() );
+	}
+
+	over += static_cast< int >( tooLong.size() );
+	return over;
+}
+
+int checkNames()
+{
+	std::printf( "names and displays longer than FFGL's 16 characters:\n\n" );
+
+	// Both variants: they do not declare the same controls, so checking one
+	// says nothing about the other.
+	const int over = checkNames( false ) + checkNames( true );
+
+	std::printf( "\n  %d over the limit\n", over );
+	return over == 0 ? 0 : 1;
+}
+
+//---------------------------------------------------------------------------
 // --list
 //---------------------------------------------------------------------------
 int listParameters()
@@ -2147,6 +2242,7 @@ void usage()
 		"  --effect            the effect build, Vectrix Trace, over an input\n"
 		"  --set ID=VALUE      set a parameter, by id or by name (repeatable)\n"
 		"  --list              every parameter: id, name, type, current value, range\n"
+		"  --names             names and displays fit FFGL's 16 characters\n"
 		"\n"
 		"  --pipe              raw RGBA frames out on stdout, for the project video\n"
 		"                      SOURCE BUILD (the default): reads NOTHING from stdin.\n"
@@ -2185,6 +2281,8 @@ int main( int argc, char** argv )
 	bool pipeMode = false;
 
 	bool doList     = false;
+
+	bool doNames   = false;
 	bool doEnergy   = false;
 	bool doDwell    = false;
 	bool doRate     = false;
@@ -2207,6 +2305,7 @@ int main( int argc, char** argv )
 		else if( arg == "--script" ) scriptPath = next();
 		else if( arg == "--fps" ) fps = std::atof( next().c_str() );
 		else if( arg == "--list" ) doList = true;
+		else if( arg == "--names" ) doNames = true;
 		else if( arg == "--energy" ) doEnergy = true;
 		else if( arg == "--dwell" ) doDwell = true;
 		else if( arg == "--rate" ) doRate = true;
@@ -2244,7 +2343,7 @@ int main( int argc, char** argv )
 
 	const bool anyGL = doEnergy || doDwell || doRate || doPoint || doBlank || doIdentity
 	                   || !outPath.empty() || pipeMode;
-	const bool any   = anyGL || doFx || doDrift || doList;
+	const bool any   = anyGL || doFx || doDrift || doList || doNames;
 	if( !any )
 	{
 		usage();
@@ -2268,6 +2367,8 @@ int main( int argc, char** argv )
 	// context exists and work on a machine with no display.
 	if( doList )
 		failures += listParameters();
+	if( doNames )
+		failures += checkNames();
 	if( doFx )
 		failures += checkFx();
 	if( doDrift )
