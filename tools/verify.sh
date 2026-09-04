@@ -278,7 +278,7 @@ head_ "The invariants"
 # These are the point of the harness: they turn "brightness follows dwell time"
 # from a sentence in AGENTS.md into something a machine checks.
 if [ -x build/vxtest ]; then
-    for test in energy dwell rate point blank identity fx drift; do
+    for test in energy dwell rate point blank identity fx drift names; do
         log="/tmp/vectrix-$test.log"
         if ./build/vxtest "--$test" >"$log" 2>&1; then
             ok "vxtest --$test"
