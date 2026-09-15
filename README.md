@@ -22,6 +22,10 @@ Inspired by [Ms Mad Lemon](https://www.youtube.com/@MsMadLemon)'s *Vector Synth
 Visualizer* series, which does the same thing with 555 timers, LM358 op-amps and
 the deflection yoke of a CRT television.
 
+![Vectrix's ring of nested outlines in phosphor green on black, rendered by the offline harness](docs/hero.png)
+
+<sub>Rendered by the plugin's own offline harness in a headless GL context — not a Resolume screen capture. Real frames through the real shipped plugin class.</sub>
+
 <!-- downloads:start -->
 
 ## Download
