@@ -26,7 +26,7 @@ public:
 static CFFGLPluginInfo PluginInfo(
 	PluginFactory< VectrixEffect >,                       // Create method
 	"VX02",                                               // Plugin unique ID of maximum length 4
-	"Vectrix Trace",                                      // Plugin name
+	"SW Vectrix Trace",                                   // Plugin name
 	2,                                                    // API major version number
 	1,                                                    // API minor version number
 	0,                                                    // Plugin major version number
