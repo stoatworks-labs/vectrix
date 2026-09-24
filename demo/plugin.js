@@ -3144,6 +3144,10 @@ const bool = (id, name, def, group, hint) =>
 
 mountDemo({
   name: 'Vectrix',
+  // The FFGL types this repo registers (EffectPlugin.cpp and SourcePlugin.cpp),
+  // for the kit banner's closing sentence, which said "effect" alone until
+  // 2026-09-24.
+  kind: ['effect', 'source'],
   pluginId: 'VX01',
   tagline:
     'An oscillator and a pedalboard driving the X/Y deflection of a cathode ray tube. It models a route, not a look: brightness follows dwell time because the beam deposits energy at a constant rate and spreads it over the distance it covers, so a fast segment is dim and a turnaround blooms. The tube here is the plugin’s own shaders; the signal chain is a partial port — the oscillator, the shapes and seven of the fourteen effects. The gate, compressor, flanger, chorus and reverb are not on this page, and neither are the wireframe, audio-file and trace sources.',
