@@ -233,6 +233,15 @@ The same code builds an OpenFX bundle carrying both plugins. Copy
 `C:\Program Files\Common Files\OFX\Plugins` (Windows) or `/usr/OFX/Plugins`
 (Linux).
 
+**v0.1.6 to v0.1.11 crashed on every render.** In those releases the OpenFX
+build segfaulted the moment a host asked either plugin for a frame, in every
+host: a table of parameter declarations kept in panel order was being looked up
+by id. **v0.1.12 fixes it. If you tried Vectrix in Resolve or another OpenFX
+host and it crashed or never rendered, update.** The Resolume build was never
+affected. From v0.1.12 both plugins render as tools on Resolve's Fusion page
+(DaVinci Resolve Studio 21.1 on macOS, 2026-10-04); Resolve's other pages,
+Vegas, Nuke and Natron have not been tried.
+
 > **On Linux the plugin needs `libGL`, and nothing else unusual.** The Trace
 > source is a GPU edge trace, so unlike every other plugin in this fleet the
 > Vectrix `.ofx` links OpenGL — its siblings need only libc, libm and libpthread.

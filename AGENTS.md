@@ -415,12 +415,15 @@ a control can be stone dead while everything compiles, links, loads and renders.
   it matters.
 - The Windows build compiles in CI and has never been run.
 - No performance figure comes from CI — hosted macOS runners have no GPU.
-- **The OpenFX build has been rendered and eyeballed, never opened in a real
-  host.** Resolve, Nuke and Natron have all not seen it. Its renderer is a CPU
-  mirror of the GLSL rather than the GLSL, so the two agreeing is a claim about
-  two transcriptions, not one measured fact — `--identity`-style passthrough is
-  exact there, but nothing cross-checks the CPU trace against the GPU trace
-  pixel for pixel.
+- **The OpenFX build has only been run on Resolve's Fusion page.** From v0.1.12
+  (the by-id declaration lookup above, which ended a segfault on every render
+  from v0.1.6 on, plus the frame-rate guard) both plugins render there as tools
+  in DaVinci Resolve Studio 21.1 on macOS (2026-10-04), and the generator
+  animates. Resolve's other pages, Nuke, Natron and Vegas have not seen it. Its
+  renderer is a CPU mirror of the GLSL rather than the GLSL, so the two agreeing
+  is a claim about two transcriptions, not one measured fact — `--identity`-style
+  passthrough is exact there, but nothing cross-checks the CPU trace against the
+  GPU trace pixel for pixel.
 
 ---
 

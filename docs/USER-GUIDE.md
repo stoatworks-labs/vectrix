@@ -23,6 +23,10 @@ went.**
 > is genuinely premultiplied, and how the Trace source's readback behaves for frame rate in a real
 > host.
 >
+> **The OpenFX build of v0.1.6 to v0.1.11 crashed on every render**, in every OpenFX host — if you
+> tried one of those, update. v0.1.12 renders as a tool on Resolve's Fusion page; it has not been
+> tried on Resolve's other pages, in Vegas, Nuke or Natron.
+>
 > This codebase was created with AI assistance, directed and reviewed by a human author.
 
 Inspired by [Ms Mad Lemon](https://www.youtube.com/@MsMadLemon)'s *Vector Synth Visualizer*
@@ -228,3 +232,8 @@ before the plugin could write a line to its own log, so there was nothing to loo
 v0.1.5.** If you are on an earlier build, delete `Vectrix.dll` and `Vectrix Trace.dll` from
 `Documents\Resolume Arena\Extra Effects`, start Resolume to confirm it is happy, then install
 v0.1.5. macOS was never affected.
+
+**In Resolve or another OpenFX host, Vectrix crashes or never renders a frame.** A bug in v0.1.6
+to v0.1.11 made the OpenFX build of both plugins segfault on every render, in every host. **Fixed
+in v0.1.12**: replace `Vectrix.ofx.bundle` with the one from the latest `-ofx-` download and
+restart the host. The Resolume build was never affected.
