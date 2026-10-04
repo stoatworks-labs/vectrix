@@ -280,6 +280,24 @@ The base implementation dereferences `m_pPlugin`, which is null outside a host,
 so `vxtest --list` segfaults on it. `PlainDisplay()` exists to be the fallback
 and is deliberately self-contained.
 
+### ☠️ The OFX declaration table is in panel order: never index it by id
+
+6e39183 ("put Preset last") moved `PT_PRESET` to the end of `ParamId` and left the
+Preset declaration where the OFX panel shows it, so from v0.1.6 on `kDecls[ id ]`
+stopped being the declaration of `id` for the last eighteen ids. `readParam( 155 )`
+took `kDecls[ 155 ]` -- Preset, an Option -- and called `getValueAtTime` on handle
+155, which belongs to `audioFft`, Absent in this build and so null. That is a
+segfault on every render, in every host, in both plugins, from v0.1.6 to v0.1.11;
+`writeParam`, which applies a preset, had the same lookup.
+
+`declFor()` now finds a declaration by its id. `kDecls` is `constexpr`, and a
+`static_assert` proves every id has exactly one declaration. The count check that
+was already there could not have caught this: the table had the right number of
+rows, in an order nobody had promised.
+
+Checked under `ofxprobe`: both plugins render in their own context again (they died
+with SIGSEGV before), and all fifteen presets apply in both.
+
 ---
 
 ## Relationship to the three siblings it sounds like

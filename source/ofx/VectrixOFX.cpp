@@ -92,6 +92,7 @@
 ///   so pressing it only discards the replay and re-simulates.
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <memory>
@@ -1222,7 +1223,7 @@ const char* const kRingWaveNames[ 3 ] = { "Sine", "Triangle", "Square" };
 #define OPTIONG( id, name, label, def, table, n, hint, group ) \
 	{ id, Kind::Option, name, label, hint, def, 0.0f, 1.0f, table, n, group }
 
-const Decl kDecls[] = {
+constexpr Decl kDecls[] = {
 	//--- Clock -------------------------------------------------------------
 	OPTIONG( PT_DETAIL, "detail", "Detail", 1.0f, kDetailNames, kDetailCount,
 	         "The internal sample rate: 48, 96 or 192 kHz. A cost dial with a visible "
@@ -1612,10 +1613,42 @@ const Decl kDecls[] = {
 
 constexpr int kDeclCount = static_cast< int >( sizeof( kDecls ) / sizeof( kDecls[ 0 ] ) );
 
-/// One declaration per parameter id, in id order, or the panel is a different
-/// plugin from the one the presets were written for.
+/// One declaration per parameter id, or the panel is a different plugin from
+/// the one the presets were written for.
 static_assert( kDeclCount == static_cast< int >( PT_COUNT ),
                "the OFX declaration table and ParamId disagree" );
+
+/// The table is in PANEL order, and that is not id order: Preset sits in the
+/// panel where it always did, but its id moved to the end of ParamId (6e39183,
+/// "put Preset last"), one past the seventeen Modulation controls the panel
+/// shows after it. So a declaration is found by its id through declFor(), never
+/// as kDecls[ id ] -- which hands back whichever declaration happens to sit at
+/// that position, with another parameter's kind, against this id's handle.
+constexpr bool everyIdDeclaredOnce()
+{
+	for( unsigned int id = 0; id < static_cast< unsigned int >( kDeclCount ); ++id )
+	{
+		int seen = 0;
+		for( const Decl& d : kDecls )
+			seen += d.id == id ? 1 : 0;
+		if( seen != 1 )
+			return false;
+	}
+	return true;
+}
+
+static_assert( everyIdDeclaredOnce(), "every parameter id needs exactly one Decl" );
+
+const Decl& declFor( unsigned int id )
+{
+	static const std::array< const Decl*, kDeclCount > byId = [] {
+		std::array< const Decl*, kDeclCount > table{};
+		for( const Decl& d : kDecls )
+			table[ d.id ] = &d;
+		return table;
+	}();
+	return *byId[ id ];
+}
 
 //---------------------------------------------------------------------------
 // The parameters a preset covers, in the order presets::Param declares them.
@@ -1812,7 +1845,7 @@ private:
 	//-----------------------------------------------------------------------
 	float readParam( unsigned int id, double time ) const
 	{
-		const Decl& d = kDecls[ id ];
+		const Decl& d = declFor( id );
 		switch( d.kind )
 		{
 		case Kind::Slider:
@@ -2076,7 +2109,7 @@ private:
 	/// same resolved value even where the table's own number is odd.
 	void writeParam( unsigned int id, float value )
 	{
-		const Decl& d = kDecls[ id ];
+		const Decl& d = declFor( id );
 		switch( d.kind )
 		{
 		case Kind::Slider:
