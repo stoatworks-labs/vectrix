@@ -254,7 +254,7 @@ The same code builds an OpenFX bundle carrying both plugins. Copy
 > prepared to make it pass.
 
 The signal chain is the same code — the engine is linked in, not reimplemented —
-but four things genuinely differ, and they are limitations rather than choices:
+but five things genuinely differ, and they are limitations rather than choices:
 
 - **It renders on the CPU.** OpenFX hands a plugin no GL context, so the beam,
   the phosphor and the glass are a mirror of the GLSL rather than the GLSL. It is
@@ -268,6 +268,12 @@ but four things genuinely differ, and they are limitations rather than choices:
   frame duration, so the modulation slots are live.
 - **The Trace source draws no beam**, because its edge pass needs a GPU. You get
   the tube, the graticule and the clip on the glass, with the gun cut off.
+- **Fusion reports no frame rate; there, time-based controls assume 24 fps.**
+  Resolve's Fusion page gives an OpenFX plugin no frame rate at all, and the first
+  OpenFX builds failed every render there. Now Vectrix falls back to 24, Resolve's
+  default timeline rate, so in Fusion the oscillator, the LFOs and the replay run
+  as if the composition were 24 fps whatever its real rate. A host that reports a
+  rate, Resolve's Edit page included, gets its own.
 
 ## Diagnostics
 
