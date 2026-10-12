@@ -234,7 +234,7 @@ v0.1.0 to v0.1.4 crashed the host while it was scanning the plugin folder (befor
 before the plugin could write a line to its own log), so there was nothing to look at. **Fixed in
 v0.1.5.** If you're on an earlier build, delete `Vectrix.dll` and `Vectrix Trace.dll` from
 `Documents\Resolume Arena\Extra Effects`, start Resolume to confirm it's happy, then install
-v0.1.5. macOS was never affected.
+v0.1.5 or later. macOS was never affected.
 
 **In Resolve or another OpenFX host, Vectrix crashes or never renders a frame.** A bug in v0.1.6
 to v0.1.11 made the OpenFX build of both plugins segfault on every render, in every host. **Fixed

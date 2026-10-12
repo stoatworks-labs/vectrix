@@ -19,7 +19,7 @@ The page carries the banner and lists what it does not reproduce at the foot.
 | renderer | everything — decay, trace, bright, blur, glass, both builds | — |
 | host | — | tempo sync, the FFT/LFO modulation matrix, the audio-file path |
 
-Ninety-one controls of the plugin's hundred and fifty. The seven effects that are
+Ninety-one controls of the plugin's hundred and seventy-three. The seven effects that are
 here are the ones that change the *figure*; the five that are not change its
 dynamics, and a second implementation of a compressor that nothing checks would
 be worth less than an honest gap.
