@@ -1,30 +1,30 @@
 # Vectrix
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. The central claim — that
-> brightness follows dwell time — is not asserted but measured: `vxtest --energy`
+> (Anthropic), directed and reviewed by a human author. The main claim, that
+> brightness follows dwell time, is measured rather than taken on trust: `vxtest --energy`
 > renders one sweep at ten speeds spanning a hundred to one and fails if the
 > total light deposited varies by more than half a percent, and `vxtest --dwell`
-> regresses the measured line density against `1/v`. Both probe the same shader
+> regresses the measured line density against `1/v`. Both test the same shader
 > code that ships. A control sweep fails if any parameter turns out to do
 > nothing (see [Building and testing](#building-and-testing)).
 
 An oscillator, a pedalboard and a cathode ray tube in X/Y mode, as two plugins
-for Resolume Arena/Avenue.
+for Resolume Arena and Avenue.
 
 A function generator makes a two-channel signal. That signal goes through
-fourteen guitar and eurorack effects — a gate, a compressor, a wavefolder, a ring
-modulator, a phaser, a delay, a spring-ish reverb — and what comes out the far
-end drives the horizontal and vertical deflection of a scope. You are not
-watching a picture of an oscilloscope. You are watching where the beam went.
+fourteen guitar and eurorack effects (a gate, a compressor, a wavefolder, a ring
+modulator, a phaser, a delay, a spring-ish reverb), and whatever comes out the
+far end drives the horizontal and vertical deflection of a scope. So what you're
+watching is where the beam went, rather than a picture of an oscilloscope.
 
-Inspired by [Ms Mad Lemon](https://www.youtube.com/@MsMadLemon)'s *Vector Synth
-Visualizer* series, which does the same thing with 555 timers, LM358 op-amps and
-the deflection yoke of a CRT television.
+It's inspired by [Ms Mad Lemon](https://www.youtube.com/@MsMadLemon)'s *Vector
+Synth Visualizer* series, which does the same thing properly, with 555 timers,
+LM358 op-amps and the deflection yoke of a CRT television.
 
 ![Vectrix's ring of nested outlines in phosphor green on black, rendered by the offline harness](docs/hero.png)
 
-<sub>Rendered by the plugin's own offline harness in a headless GL context — not a Resolume screen capture. Real frames through the real shipped plugin class.</sub>
+<sub>Rendered by the plugin's own offline harness in a headless GL context rather than captured from Resolume: actual frames through the shipped plugin class.</sub>
 
 <!-- downloads:start -->
 
@@ -80,17 +80,18 @@ Both declare the same parameters, so a composition can be moved between them.
 
 ## Why brightness follows dwell time
 
-This models a route, not a look. Every artefact is a consequence.
+Vectrix models the whole route from signal to glass, and every artefact comes
+out of that.
 
-The beam deposits light at a constant rate while it is on. Where it moves fast it
+The beam deposits light at a constant rate while it's on. Where it moves fast it
 spreads that light over a long distance and the trace is dim; where it turns
-around it lingers, and the trace blooms. That single fact is why a square drawn
-by an oscilloscope has bright corners and a square drawn by a computer does not.
+around it lingers, and the trace blooms. That one fact is why a square drawn by
+an oscilloscope has bright corners and a square drawn by a computer doesn't.
 
 So the renderer never computes `1/v`. It deposits a fixed quantum of energy per
 sample interval and spreads it over the distance the beam actually covered, and
-the `1/v` falls out — along with the correct behaviour at both extremes, with no
-clamps: a beam crossing the screen in one step is faint, and a beam standing
+the `1/v` falls out of that, along with the right behaviour at both extremes and
+no clamps: a beam crossing the screen in one step is faint, and a beam standing
 still is bright but finite, because the energy is conserved either way.
 
 Everything else follows the same rule. The delay's repeats get rounder because
@@ -99,8 +100,7 @@ corners. The gate darkens the trace without moving it, because a grid voltage
 cuts beam current without touching the yoke. Sample & Hold draws lines between
 its steps because the beam travels rather than teleporting. Turn on **Blank on
 Retrace** with two sawtooths and you get a clean raster, because the beam is
-genuinely cut off during flyback — not because anything declined to draw the
-flyback line.
+actually cut off during flyback. Nothing is skipping the flyback line.
 
 ## Sources
 
@@ -115,9 +115,9 @@ flyback line.
   and vectrix plays it. Mono files get a delayed-self plot rather than a flat
   line.
 - **Trace** (effect only) — finds the edges of the clip below and walks them with
-  the beam. **Honest expectation: excellent on titles, logos, graphics and line
-  art; a scribble on real footage.** That is a property of the problem, not a
-  setting to find.
+  the beam. **Expect it to be excellent on titles, logos, graphics and line art,
+  and a scribble on real footage.** That's down to the problem itself, and
+  there isn't a setting that fixes it.
 
 ## Effects
 
@@ -129,30 +129,32 @@ VCA → Gate → Compressor → Rectifier → Slew → Drive/Fold → Ring Mod �
     → Phaser → Flanger → Chorus → Delay → Reverb → Deflection Amp
 ```
 
-Each can process both axes, one axis, or the mid/side pair — and that routing
-control is where most of the pictures come from, because an effect applied to one
-deflection axis and not the other is not a filter, it is a geometric transform.
+Each can process both axes, one axis, or the mid/side pair, and that routing
+control is where most of the pictures come from: an effect applied to one
+deflection axis and not the other stops being a filter and becomes a geometric
+transform.
 
 Three worth calling out:
 
 - **Phaser** is the one that justifies doing any of this on the CPU. On X only it
   shifts each frequency component of the horizontal deflection by a different
-  amount, so a sine figure *rotates* and a complex one *shears*. That is not an
+  amount, so a sine figure *rotates* and a complex one *shears*. That isn't an
   affine transform, so no shader can produce it. At Mix 1.0 there are no notches
   at all and it becomes a pure rotator.
-- **Compressor** pumps the figure's *size*. It is the single best block for
-  making a static figure feel alive, and it is what makes the audio-file source
+- **Compressor** pumps the figure's *size*. It's the single best block for
+  making a static figure feel alive, and it's what makes the audio-file source
   usable, since scope music has wildly varying level. Its limiter offers **Gain**
   (the figure shrinks) or **Rail** (the figure flattens against the edge of the
-  screen, exactly as a deflection amplifier does when it runs out of headroom).
+  screen, the way a deflection amplifier does when it runs out of headroom).
 - **Slew limiter** rounds every corner, and turns Sample & Hold from a
   constellation into a constellation with strings.
 
 ## The tube
 
-The phosphors are a measured table, not a tint. **P31** is the modern scope
-green, and at true persistence it shows no trail at all at 60 fps — because that
-is what P31 *is*, and why nobody photographs slow sweeps on one. **P7** is the
+The phosphors come from a table of measured data rather than a tint. **P31** is
+the modern scope green, and at true persistence it shows no trail at all at
+60 fps, because that's what P31 *is* (and why nobody photographs slow sweeps on
+one). **P7** is the
 two-layer cascade: a blue flash that pumps a yellow-green layer underneath, so
 the trail is a different colour from the strike. Switching phosphor changes the
 brightness by up to three times, because the efficiencies are real.
@@ -162,23 +164,23 @@ second renderer: the defaults are a round lab scope, and 4:3 with a small corner
 radius and a little overscan gives you the consumer television from the videos.
 
 The face buffer is sized by the **spot**, not by the output, so 4K costs about
-two and a half times 1080p rather than four. The real cost driver is Focus — a
-sharper tube genuinely resolves more and genuinely costs more.
+two and a half times 1080p rather than four. What actually drives the cost is
+Focus: a sharper tube resolves more, and costs more for it.
 
 ## Controls
 
-About a hundred and fifty of them, in sixteen groups. That is a lot, and cutting
-them is not the answer, because the effect parameters *are* the plugin. Start
-from a **preset** — each one is a whole machine rather than a set of slider
-positions, so turning one knob on it does something you can predict — and go from
+About a hundred and fifty of them, in sixteen groups. That's a lot, I know, but
+the effect parameters *are* the plugin, so cutting them wouldn't help. Start
+from a **preset** (each one is a whole machine rather than a set of slider
+positions, so turning one knob on it does something you can predict) and go from
 there.
 
 ## Watch it
 
 [**Vectrix — an oscillator, a pedalboard and an oscilloscope**](https://www.youtube.com/watch?v=CmmhEgHyGzg)
-(55 seconds). Every frame is the real plugin: an FFGL plugin has no window, so
-the footage is rendered by the plugin's own offline harness rather than screen
-recorded, from the same class Resolume loads.
+(55 seconds). It's all the plugin's own output. An FFGL plugin doesn't have a
+window to film, so the footage comes from the plugin's offline harness, running
+the same class Resolume loads, rather than a screen recording.
 
 ## Trying it
 
@@ -186,12 +188,12 @@ A browser demo runs at
 [vectrix-demo.stoatworks-labs.com](https://vectrix-demo.stoatworks-labs.com).
 Nothing you load there leaves your machine.
 
-It carries the **whole renderer** — the same nine shader sources, checked
-character for character against the plugin's by `demo/tools/check_shaders.py` —
+It carries the **whole renderer** (the same nine shader sources, checked
+character for character against the plugin's by `demo/tools/check_shaders.py`)
 and a **subset** of the signal chain: the oscillator and the shapes, plus the
 rectifier, slew limiter, wavefolder, ring modulator, bitcrusher, phaser and
-delay. The wireframe, audio-file and trace sources and the remaining effects are
-not in it. The page says so too.
+delay. The wireframe, audio-file and trace sources and the remaining effects
+aren't in it, and the page says so too.
 
 ## Build
 
@@ -204,8 +206,8 @@ cmake --install build      # into ~/Documents/Resolume Arena/Extra Effects
 ```
 
 The Opus decoder builds libogg, libopus and libopusfile from source as
-submodules, which keeps the universal macOS binary working — a vcpkg port could
-not, because vcpkg triplets are per-architecture. Configure with
+submodules, which keeps the universal macOS binary working. A vcpkg port
+couldn't, because vcpkg triplets are per-architecture. Configure with
 `-DVECTRIX_WITH_OPUS=OFF` to drop `.opus` support and those three submodules.
 
 ## Building and testing
@@ -222,8 +224,8 @@ python3 tools/sweep.py       # no dead controls
 See the "what is genuinely verified, and what is assumed" section of
 [AGENTS.md](AGENTS.md), which is blunt about it. The short version: the physics
 is measured by the harness, and both plugins have been **loaded and run in
-Resolume Arena**. What is still unconfirmed is narrower — whether Arena's input
-is genuinely premultiplied, and how the Trace source's readback behaves for
+Resolume Arena**. What's still unconfirmed is narrower: whether Arena's input
+is actually premultiplied, and how the Trace source's readback behaves for
 frame rate in a real host.
 
 ## OpenFX — Resolve, Vegas, Nuke, Natron
@@ -239,39 +241,39 @@ host: a table of parameter declarations kept in panel order was being looked up
 by id. **v0.1.12 fixes it. If you tried Vectrix in Resolve or another OpenFX
 host and it crashed or never rendered, update.** The Resolume build was never
 affected. From v0.1.12 both plugins render as tools on Resolve's Fusion page
-(DaVinci Resolve Studio 21.1 on macOS, 2026-10-04); Resolve's other pages,
-Vegas, Nuke and Natron have not been tried.
+(DaVinci Resolve Studio 21.1 on macOS, 2026-10-04). I haven't tried Resolve's
+other pages, Vegas, Nuke or Natron.
 
 > **On Linux the plugin needs `libGL`, and nothing else unusual.** The Trace
 > source is a GPU edge trace, so unlike every other plugin in this fleet the
-> Vectrix `.ofx` links OpenGL — its siblings need only libc, libm and libpthread.
+> Vectrix `.ofx` links OpenGL (its siblings only need libc, libm and libpthread).
 > GLEW is linked statically into the binary, so the only thing the machine has to
 > supply is `libGL.so.1`, which is present on anything capable of running Resolve
 > and comes from the base repository on Rocky 8 / RHEL 8 (`mesa-libGL`).
 >
-> **If you are on v0.1.3, this is not yet true of your build.** That release
+> **If you're on v0.1.3, this isn't true of your build yet.** That release
 > shipped a `.ofx` that needs `libGLEW.so.2.0` on the machine, which on Rocky 8
 > means enabling PowerTools and installing `glew-devel`. Its release notes carry
 > the commands. Upgrading is the easier fix.
 >
-> Either way the failure mode is worth knowing, because it is silent: **an OFX
-> host does not report a plugin that failed to load.** Resolve simply starts with
-> no Vectrix in the effects list and nothing in any log, which reads as a broken
-> download rather than a missing library. That is why CI now runs its load test
-> on a stock Rocky 8 with no GL libraries beyond `mesa-libGL` — so that the test
-> passing is evidence about a real machine, rather than about a container
-> prepared to make it pass.
+> Either way the failure mode is worth knowing, because it's silent: **an OFX
+> host doesn't report a plugin that failed to load.** Resolve just starts with
+> no Vectrix in the effects list and nothing in any log, which looks like a broken
+> download rather than a missing library. That's why CI now runs its load test
+> on a stock Rocky 8 with no GL libraries beyond `mesa-libGL`, so a pass says
+> something about a real machine rather than about a container set up to make
+> it pass.
 
-The signal chain is the same code — the engine is linked in, not reimplemented —
-but five things genuinely differ, and they are limitations rather than choices:
+The signal chain is the same code (the engine is linked in, not reimplemented),
+but five things differ, and they're limitations rather than choices:
 
 - **It renders on the CPU.** OpenFX hands a plugin no GL context, so the beam,
-  the phosphor and the glass are a mirror of the GLSL rather than the GLSL. It is
+  the phosphor and the glass are a mirror of the GLSL rather than the GLSL. It's
   offline-render speed, not interactive.
-- **It replays.** Vectrix is stateful — phosphor, delay lines, a reverb tank —
-  and OpenFX renders frames in whatever order it likes. So a seek, a jump or a
+- **It replays.** Vectrix is stateful (phosphor, delay lines, a reverb tank),
+  and OpenFX renders frames in whatever order it fancies. So a seek, a jump or a
   parameter edit restarts the chain and warms it up over 120 frames. A linear
-  render is exact; a reverb tail longer than that window is not.
+  render is exact; a reverb tail longer than that window isn't.
 - **No tempo and no audio.** OpenFX has neither, so the tempo is pinned at 120
   and the spectrum reads as silence. The LFOs still run, since they need only a
   frame duration, so the modulation slots are live.
@@ -287,8 +289,8 @@ but five things genuinely differ, and they are limitations rather than choices:
 ## Diagnostics
 
 `source/Diag.{h,cpp}` writes a log file and nothing else: no crash handler, since
-this runs inside someone else's host. It exists for the one failure that actually
-happens — a shader that will not compile, which otherwise looks like "the effect
+this runs inside someone else's host. It's there for the one failure that actually
+happens: a shader that won't compile, which otherwise looks like "the effect
 does nothing" with no message anywhere. `~/Library/Logs/vectrix/` on macOS.
 
 <!-- attributions:start -->
