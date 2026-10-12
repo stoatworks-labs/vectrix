@@ -169,8 +169,8 @@ Focus: a sharper tube resolves more, and costs more for it.
 
 ## Controls
 
-About a hundred and fifty of them, in sixteen groups. That's a lot, I know, but
-the effect parameters *are* the plugin, so cutting them wouldn't help. Start
+A hundred and seventy-odd of them, in twenty-seven groups. That's a lot, I know,
+but the effect parameters *are* the plugin, so cutting them wouldn't help. Start
 from a **preset** (each one is a whole machine rather than a set of slider
 positions, so turning one knob on it does something you can predict) and go from
 there.

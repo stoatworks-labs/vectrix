@@ -191,7 +191,7 @@ Copy `Vectrix.ofx.bundle` to `/Library/OFX/Plugins` (macOS),
 > The failure mode is silent either way: an OFX host doesn't report a plugin
 > that failed to load, so a missing library looks like a broken download.
 
-The signal chain is the same code (the engine is linked in, not reimplemented), but four things
+The signal chain is the same code (the engine is linked in, not reimplemented), but five things
 differ, and they're limitations rather than choices:
 
 - **It renders on the CPU.** OpenFX hands a plugin no GL context, so the beam, the phosphor and the
@@ -205,6 +205,11 @@ differ, and they're limitations rather than choices:
   slots are live.
 - **The Trace source draws no beam**, because its edge pass needs a GPU. You get the tube, the
   graticule and the clip on the glass, with the gun cut off.
+- **Resolve's Fusion page reports the frame rate on the effect but not on its clips.** The first
+  OpenFX builds read a clip's rate, which Fusion leaves out, and failed every render there. Now
+  Vectrix asks the output clip, the source clip and then the effect, so in Fusion the oscillator,
+  the LFOs and the replay run at the timeline's own rate (checked at 24 and 25 fps). It assumes
+  24 fps, Resolve's default timeline rate, only where a host reports no rate at all.
 
 ---
 
