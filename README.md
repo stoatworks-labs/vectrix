@@ -22,6 +22,8 @@ It's inspired by [Ms Mad Lemon](https://www.youtube.com/@MsMadLemon)'s *Vector
 Synth Visualizer* series, which does the same thing properly, with 555 timers,
 LM358 op-amps and the deflection yoke of a CRT television.
 
+The [project page](https://stoatworks-labs.com/software/vectrix/) has the downloads, the [user guide](https://stoatworks-labs.com/software/vectrix/guide/) and the video.
+
 ![Vectrix's ring of nested outlines in phosphor green on black, rendered by the offline harness](docs/hero.png)
 
 <sub>Rendered by the plugin's own offline harness in a headless GL context rather than captured from Resolume: actual frames through the shipped plugin class.</sub>
