@@ -406,9 +406,13 @@ a control can be stone dead while everything compiles, links, loads and renders.
   on opaque footage would look right either way.
 - **Whether Resolume's `SetTime` for a *source* plugin is the clip transport or
   the composition clock is not known.** It matters for the Locked file sync mode.
-- **The trace readback has never been measured in a real host.** This is the
-  first plugin in the fleet to call `glReadPixels` inside `ProcessOpenGL`. The
-  PBO path should make it asynchronous; that is reasoning, not measurement.
+- **The trace readback works in a real host but has never been timed there.**
+  This is the first plugin in the fleet to call `glReadPixels` inside
+  `ProcessOpenGL`. On 2026-11-18 Trace drew a two-line title in Arena 7.29.0 on
+  macOS (Apple silicon), the beam a median 2 px from its outline with DC Block
+  off, so the readback delivers. What it costs a frame there is still unknown:
+  the PBO path should make it asynchronous, and that is reasoning, not
+  measurement.
 - **`GL_RG32F` blending has only been exercised on Apple silicon.** It is
   required in GL 4.1 but runs at reduced rate on some parts.
 - **Nothing has been run on Intel**, so the denormal flushing is untested where

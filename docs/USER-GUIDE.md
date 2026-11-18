@@ -19,8 +19,10 @@ oscilloscope.
 >
 > **Both plugins have been loaded and run in Resolume Arena**, and since v0.1.5 both are also
 > confirmed to load and register in Arena on Windows, which is worth saying out loud, because up to
-> v0.1.4 they didn't. What's still unconfirmed is narrower: whether Arena's input is actually
-> premultiplied, and how the Trace source's readback behaves for frame rate in a real host.
+> v0.1.4 they didn't. From v0.1.13, Trace has drawn on a title in Arena on macOS too, with the beam
+> a couple of pixels from the title's outline. What's still unconfirmed is narrower: whether Arena's
+> input is actually premultiplied, and what the Trace source's readback costs in frame rate in a
+> real host.
 >
 > **The OpenFX build of v0.1.6 to v0.1.11 crashed on every render**, in every OpenFX host, so if
 > you tried one of those, update. v0.1.12 renders as a tool on Resolve's Fusion page; I haven't
