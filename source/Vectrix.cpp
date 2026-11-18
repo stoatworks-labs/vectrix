@@ -1047,18 +1047,30 @@ FFResult VectrixPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 			diag::info( "audio file: " + engine.File().Note() );
 	}
 
+	const BeamGeometry::RenderParams rp = renderParams( resolved, clock.FrameSeconds() );
+
 	//The trace source needs this frame's strokes before the engine renders, and
 	//it is the only part of the signal path that touches GL.
+	//
+	//Registered to the clip as the glass paints it: across the whole output,
+	//in square units of half the output height. A beam at `b` beam units lands
+	//at `b * faceFit` of those, and a volt is `deflectionGain` beam units, so
+	//the clip's right and top edges sit at the volts below -- at any curvature,
+	//since the glass warps the clip and the phosphor through the same bulge.
 	if( overInput && resolved.source == SourceKind::Trace )
-		engine.Trace().Update( clipTexture, maxU, maxV );
+	{
+		const float outputAspect = static_cast< float >( viewport[ 2 ] ) / static_cast< float >( viewport[ 3 ] );
+		const float faceFit      = faceFitScale( outputAspect, std::max( rp.tube.faceAspect, 0.05f ) );
+		const float perVolt      = std::max( rp.tube.deflectionGain * faceFit, 1e-3f );
+		engine.Trace().Update( clipTexture, maxU, maxV, outputAspect / perVolt, 1.0f / perVolt );
+	}
 
 	engine.Advance( clock.FrameSeconds(), clock.Now() );
 
 	const int n           = clock.SamplesForThisFrame( engine.SampleRate() );
 	const Sample* samples = engine.Render( n, clock.FrameSeconds() );
 
-	const bool drawn = beam.Render( samples, n, renderParams( resolved, clock.FrameSeconds() ),
-	                                pGL->HostFBO, viewport, clipTexture, maxU, maxV );
+	const bool drawn = beam.Render( samples, n, rp, pGL->HostFBO, viewport, clipTexture, maxU, maxV );
 
 	if( ++frameCounter == 60 )
 	{

@@ -57,6 +57,8 @@ class VectrixPlugin : public CFFGLPlugin
 public:
 	/// Declare the host clock's unit for the offline harness.
 	void SetClockScaleForTest( double scale ) { clock.SetScaleForTest( scale ); }
+	/// The trace source, for the offline harness: its strokes and its CPU half.
+	TraceSource& TraceForTest() { return engine.Trace(); }
 
 	explicit VectrixPlugin( bool overInput );
 	~VectrixPlugin() override = default;

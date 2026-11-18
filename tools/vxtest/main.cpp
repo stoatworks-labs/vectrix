@@ -17,6 +17,7 @@
         --identity  the effect build at Beam 0 is bit-identical to its input
         --fx        Householder is orthogonal; a knob move keeps the tails
         --drift     ten minutes of phase accumulation stays exact
+        --trace     the Trace source lands on the clip's edges, one closed stroke a loop
         --all       every one of the above, with a summary
 
         --out PATH  render a frame     --size WxH   --frames N   --preset N
@@ -107,6 +108,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -1564,6 +1566,268 @@ int checkIdentity()
 }
 
 //---------------------------------------------------------------------------
+// --trace
+//---------------------------------------------------------------------------
+//
+// The Trace source shipped in v0.1.12 without ever having been pointed at a
+// picture, and on its first real one -- a round record label with two words on
+// it, in vjshow's offline host -- it drew a tall ellipse in the middle of the
+// glass and a zig-zag where each word was. Three claims, each of which that
+// render broke:
+//
+// **The beam lands on the clip's edges.** The effect paints the clip behind
+// the glass across the whole output, so a traced contour has to sit on the
+// contour it was traced from. A grey disc goes in; the beam's light is read
+// back as G - B (the clip is grey, so G == B there, and P31 is green), and its
+// peak along 24 rays from the centre has to be at the disc's radius. v0.1.12
+// mapped the mask's corners to +-1 V, so on a 16:9 output the horizontal
+// radius came out at 0.44 of the disc's and the vertical at 0.79.
+//
+// **A clean closed contour is one closed stroke.** The skeleton of a circle is
+// a closed one-pixel loop, and it has to come back as exactly one stroke whose
+// ends meet -- not arcs cut at every staircase corner, with gaps between them.
+//
+// **The CPU half fits in a frame.** Printed, not asserted: the harness runs on
+// machines of every speed, and a timing threshold is a flaky test.
+//
+// DC Block is off for the registration pass, and on purpose. It is a 5 Hz
+// high-pass on each deflection axis, and a figure redrawn at the default 24 Hz
+// refresh has its fundamental rotated about 11 degrees against its harmonics
+// -- a real distortion of a real AC-coupled amplifier, and not what is being
+// measured here.
+GLuint makeDiscTexture( int width, int height, float centreX, float centreY, float radius, float level )
+{
+	std::vector< unsigned char > image( static_cast< size_t >( width ) * height * 4 );
+	for( int y = 0; y < height; ++y )
+	{
+		for( int x = 0; x < width; ++x )
+		{
+			// 4x4 supersampled, so the edge is antialiased the way a title is.
+			int inside = 0;
+			for( int sy = 0; sy < 4; ++sy )
+				for( int sx = 0; sx < 4; ++sx )
+				{
+					const float dx = static_cast< float >( x ) + ( static_cast< float >( sx ) + 0.5f ) / 4.0f - centreX;
+					const float dy = static_cast< float >( y ) + ( static_cast< float >( sy ) + 0.5f ) / 4.0f - centreY;
+					inside += dx * dx + dy * dy <= radius * radius ? 1 : 0;
+				}
+			const auto v     = static_cast< unsigned char >( std::lround( level * 255.0f * static_cast< float >( inside ) / 16.0f ) );
+			unsigned char* p = image.data() + ( static_cast< size_t >( y ) * width + x ) * 4;
+			p[ 0 ] = p[ 1 ] = p[ 2 ] = v;
+			p[ 3 ]                   = 255;
+		}
+	}
+
+	GLuint texture = 0;
+	glGenTextures( 1, &texture );
+	glBindTexture( GL_TEXTURE_2D, texture );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data() );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	glBindTexture( GL_TEXTURE_2D, 0 );
+	return texture;
+}
+
+int checkTraceRegistration()
+{
+	constexpr int kWidth  = 960;
+	constexpr int kHeight = 540;
+	constexpr int kFrames = 16;
+
+	// Centred, so DC Block would have nothing to move even if it were on, and
+	// inside the round face of the default lab scope.
+	const float centreX = kWidth * 0.5f;
+	const float centreY = kHeight * 0.5f;
+	const float radius  = kHeight * 0.35f;
+
+	Target target     = makeTarget( kWidth, kHeight, true );
+	const GLuint clip = makeDiscTexture( kWidth, kHeight, centreX, centreY, radius, 0.6f );
+
+	VectrixPlugin plugin( true );
+	plugin.SetFloatParameter( PT_SOURCE, static_cast< float >( SourceKind::Trace ) );
+	plugin.SetFloatParameter( PT_FACE_BLACK, 0.0f );
+	plugin.SetFloatParameter( PT_GRATICULE, 0.0f );
+	plugin.SetFloatParameter( PT_HALATION, 0.0f );
+	plugin.SetFloatParameter( PT_CURVATURE, 0.0f );
+	plugin.SetFloatParameter( PT_VIGNETTE, 0.0f );
+	plugin.SetFloatParameter( PT_OUT_DC, 0.0f );
+
+	bool drew = startPlugin( plugin, target );
+	for( int frame = 0; frame < kFrames && drew; ++frame )
+		drew = renderFrame( plugin, target, frame, clip );
+
+	int failures = 0;
+	if( !drew )
+	{
+		std::fprintf( stderr, "trace: render failed\n" );
+		failures = 1;
+	}
+	else
+	{
+		const std::vector< float > pixels = readFloats( target );
+		auto beamAt = [ & ]( float x, float y ) {
+			const int ix = std::clamp( static_cast< int >( x ), 0, kWidth - 1 );
+			const int iy = std::clamp( static_cast< int >( y ), 0, kHeight - 1 );
+			const float* p = pixels.data() + ( static_cast< size_t >( iy ) * kWidth + ix ) * 4;
+			return std::max( 0.0f, p[ 1 ] - p[ 2 ] );
+		};
+
+		// One mask texel in output pixels, the resolution the edge is found at.
+		const float texel = static_cast< float >( kWidth ) / static_cast< float >( TraceSource::kWidth );
+
+		constexpr int kRays = 24;
+		float worst = 0.0f;
+		float horizontal = 0.0f;
+		float vertical   = 0.0f;
+		bool lit         = true;
+		for( int ray = 0; ray < kRays; ++ray )
+		{
+			const float angle = 6.2831853f * static_cast< float >( ray ) / kRays;
+			float best        = 0.0f;
+			float bestRadius  = 0.0f;
+			for( float r = 0.0f; r < kHeight * 0.5f; r += 0.5f )
+			{
+				const float v = beamAt( centreX + r * std::cos( angle ), centreY + r * std::sin( angle ) );
+				if( v > best )
+				{
+					best       = v;
+					bestRadius = r;
+				}
+			}
+			lit   = lit && best > 0.0f;
+			worst = std::max( worst, std::fabs( bestRadius - radius ) );
+			if( ray % 12 == 0 )
+				horizontal += bestRadius * 0.5f;
+			if( ray % 12 == 6 )
+				vertical += bestRadius * 0.5f;
+		}
+
+		std::printf( "  a grey disc of radius %.1f px on a %dx%d output, mask %dx%d (%.2f px a texel)\n",
+		             radius, kWidth, kHeight, TraceSource::kWidth, TraceSource::kHeight, texel );
+		std::printf( "  the beam's peak: horizontal radius %.1f px, vertical %.1f px, worst ray off by %.1f px\n",
+		             horizontal, vertical, worst );
+
+		if( !lit )
+		{
+			std::printf( "  some rays found no beam light at all\n" );
+			++failures;
+		}
+		// Within one and a half mask texels: the edge can only be found to the
+		// mask's resolution, and the Sobel band is two texels wide before the
+		// thinning picks one.
+		if( worst > 1.5f * texel )
+		{
+			std::printf( "  the trace is NOT on the disc's edge (allowed %.1f px)\n", 1.5f * texel );
+			++failures;
+		}
+
+		const Strokes& strokes = plugin.TraceForTest().Current();
+		const bool closed = strokes.size() == 1 && strokes[ 0 ].size() >= 3
+		                    && strokes[ 0 ].x.front() == strokes[ 0 ].x.back()
+		                    && strokes[ 0 ].y.front() == strokes[ 0 ].y.back();
+		std::printf( "  %zu stroke(s)%s\n", strokes.size(), closed ? ", closed" : "" );
+		if( !closed )
+		{
+			std::printf( "  a disc's edge should come back as exactly one closed stroke\n" );
+			++failures;
+		}
+	}
+
+	glDeleteTextures( 1, &clip );
+	plugin.DeInitGL();
+	releaseTarget( target );
+	return failures;
+}
+
+/// The CPU half on its own, with no GL: a synthetic mask in, strokes out.
+int checkTraceExtraction()
+{
+	constexpr int w = TraceSource::kWidth;
+	constexpr int h = TraceSource::kHeight;
+	int failures    = 0;
+
+	// A ring, two texels thick, the way Sobel draws an edge. Square mask pixels
+	// on a 16:9 mask, so with volts in the same ratio it must come out round.
+	std::vector< unsigned char > mask( static_cast< size_t >( w ) * h, 0 );
+	const float ringRadius = h * 0.35f;
+	for( int y = 0; y < h; ++y )
+		for( int x = 0; x < w; ++x )
+		{
+			const float d = std::hypot( x + 0.5f - w * 0.5f, y + 0.5f - h * 0.5f );
+			if( std::fabs( d - ringRadius ) <= 1.0f )
+				mask[ static_cast< size_t >( y ) * w + x ] = 200;
+		}
+
+	TraceSource trace;
+	trace.Prepare( 96000.0 );
+	const float aspect = static_cast< float >( w ) / static_cast< float >( h );
+	trace.ExtractForTest( mask.data(), aspect, 1.0f );
+
+	const Strokes& strokes = trace.Current();
+	float smallest = 1e9f;
+	float largest  = 0.0f;
+	if( strokes.size() == 1 )
+		for( size_t i = 0; i < strokes[ 0 ].size(); ++i )
+		{
+			const float r = std::hypot( strokes[ 0 ].x[ i ], strokes[ 0 ].y[ i ] );
+			smallest      = std::min( smallest, r );
+			largest       = std::max( largest, r );
+		}
+	const float expected = 2.0f * ringRadius / static_cast< float >( h );
+	const bool closed    = strokes.size() == 1 && strokes[ 0 ].x.front() == strokes[ 0 ].x.back()
+	                    && strokes[ 0 ].y.front() == strokes[ 0 ].y.back();
+	std::printf( "  a %dx%d ring: %zu stroke(s)%s, radius %.3f..%.3f V (drawn at %.3f V)\n", w, h,
+	             strokes.size(), closed ? ", closed" : "", smallest, largest, expected );
+	if( !closed )
+	{
+		std::printf( "  a ring should come back as exactly one closed stroke\n" );
+		++failures;
+	}
+	if( strokes.size() == 1 && ( smallest < expected * 0.94f || largest > expected * 1.06f ) )
+	{
+		std::printf( "  the ring did not come back round at its own radius\n" );
+		++failures;
+	}
+
+	// Timing, on something closer to footage: a mask full of thick wandering
+	// bands, which is the most thinning work there is.
+	std::vector< unsigned char > busy( static_cast< size_t >( w ) * h, 0 );
+	for( int y = 0; y < h; ++y )
+		for( int x = 0; x < w; ++x )
+		{
+			const float u = static_cast< float >( x ) * 128.0f / w;
+			const float v = static_cast< float >( y ) * 72.0f / h;
+			const float s = std::sin( u * 0.9f + 3.0f * std::sin( v * 0.2f ) ) * std::sin( v * 0.8f + 2.0f * std::sin( u * 0.15f ) );
+			busy[ static_cast< size_t >( y ) * w + x ] = static_cast< unsigned char >( s > 0.2f ? 255 : 0 );
+		}
+	TraceParams busyParams;
+	busyParams.maxStrokes = 64;
+	trace.SetParams( busyParams );
+	std::vector< double > times;
+	for( int run = 0; run < 30; ++run )
+	{
+		const auto start = std::chrono::steady_clock::now();
+		trace.ExtractForTest( busy.data(), aspect, 1.0f );
+		times.push_back( std::chrono::duration< double, std::milli >( std::chrono::steady_clock::now() - start ).count() );
+	}
+	std::sort( times.begin(), times.end() );
+	std::printf( "  extraction on a busy %dx%d mask: median %.2f ms, worst %.2f ms (a 60 fps frame is 16.7)\n",
+	             w, h, times[ times.size() / 2 ], times.back() );
+
+	return failures;
+}
+
+int checkTrace()
+{
+	int failures = checkTraceExtraction();
+	failures += checkTraceRegistration();
+	std::printf( failures == 0 ? "trace: ok\n" : "trace: %d FAILED\n", failures );
+	return failures;
+}
+
+//---------------------------------------------------------------------------
 // --fx
 //---------------------------------------------------------------------------
 //
@@ -2231,6 +2495,7 @@ void usage()
 		"  --identity          the effect build at Beam 0 is bit-identical to its input\n"
 		"  --fx                Householder is orthogonal; a knob move keeps the tails (no GL)\n"
 		"  --drift             ten minutes of phase accumulation stays exact (no GL)\n"
+		"  --trace             the Trace source lands on the clip's edges, one closed stroke a loop\n"
 		"  --all               every check above, with a summary\n"
 		"\n"
 		"  --out PATH          render one frame to a PNG\n"
@@ -2291,6 +2556,7 @@ int main( int argc, char** argv )
 	bool doIdentity = false;
 	bool doFx       = false;
 	bool doDrift    = false;
+	bool doTrace    = false;
 
 	for( int i = 1; i < argc; ++i )
 	{
@@ -2314,8 +2580,9 @@ int main( int argc, char** argv )
 		else if( arg == "--identity" ) doIdentity = true;
 		else if( arg == "--fx" ) doFx = true;
 		else if( arg == "--drift" ) doDrift = true;
+		else if( arg == "--trace" ) doTrace = true;
 		else if( arg == "--all" )
-			doEnergy = doDwell = doRate = doPoint = doBlank = doIdentity = doFx = doDrift = true;
+			doEnergy = doDwell = doRate = doPoint = doBlank = doIdentity = doFx = doDrift = doTrace = true;
 		else if( arg == "--size" )
 		{
 			const std::string value = next();
@@ -2341,7 +2608,7 @@ int main( int argc, char** argv )
 		}
 	}
 
-	const bool anyGL = doEnergy || doDwell || doRate || doPoint || doBlank || doIdentity
+	const bool anyGL = doEnergy || doDwell || doRate || doPoint || doBlank || doIdentity || doTrace
 	                   || !outPath.empty() || pipeMode;
 	const bool any   = anyGL || doFx || doDrift || doList || doNames;
 	if( !any )
@@ -2414,6 +2681,8 @@ int main( int argc, char** argv )
 		failures += checkBlank();
 	if( doIdentity )
 		failures += checkIdentity();
+	if( doTrace )
+		failures += checkTrace();
 
 	if( !outPath.empty() )
 	{

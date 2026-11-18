@@ -117,6 +117,19 @@ delayed-self plot rather than a flat line.
 it to be excellent on titles, logos, graphics and line art, and a scribble on real footage.** That's
 down to the problem itself, and there isn't a setting that fixes it.
 
+The beam draws each edge where the glass shows it, so the figure sits on the clip behind it. Two
+settings decide how cleanly:
+
+- **Switch DC Block off** (Output). It models an AC-coupled amplifier, which centres any figure on
+  its own average position and bends its slowest component — correct for an oscillator, and enough
+  to pull a traced title visibly off the title.
+- **Raise Max Strokes** for anything with more than a couple of words. Every letter is at least one
+  stroke and its holes are more; past the limit the shortest strokes are dropped first.
+
+The edge pass sees the picture at 512x288, about the size of the beam's own spot. Lettering whose
+strokes or gaps are only a few pixels wide in a 1080p picture merges there and comes out as loops
+rather than letters: set titles big, and not too tightly spaced.
+
 ---
 
 ## The pedalboard
@@ -222,6 +235,11 @@ exact rationals precisely so it *can* stand still.
 P31 against P7 is up to a factor of three.
 
 **Trace on real footage is a scribble.** Expected. Use it on titles, logos and line art.
+
+**The trace sits a little off the title, or leans.** DC Block is on. Switch it off for Trace.
+
+**A traced title smears as it moves.** That is persistence: P7 and P39 keep each frame's contour
+lit for a long time. Use P31, or turn Persistence down.
 
 **No trail at all on P31.** Also correct, and the reason P7 exists.
 

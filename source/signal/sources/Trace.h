@@ -39,16 +39,31 @@ struct TraceParams
 
 	**The readback is the risk**, and this is the first plugin in the fleet to do
 	one inside ProcessOpenGL. Two mitigations, both load-bearing: read back
-	*small* (128x72 single-channel is 9 KB), and read back *late* -- a
+	*small* (one byte a pixel at the mask size below), and read back *late* -- a
 	double-buffered PBO, mapping the buffer issued last frame. The data is one
 	frame old, which on a traced contour is invisible, and it turns a full
 	pipeline stall into an asynchronous DMA.
+
+	**The mask has to resolve a letter, not just a word.** At 128x72 a title's
+	letters were five to seven mask pixels tall, Sobel merged each word into
+	one band, and the walk drew the band's skeleton -- a zig-zag along every
+	word, which is the scribble the guide promises titles will not be. See
+	docs/NOTES.md, 2026-11-18.
+
+	**The strokes are registered to the clip as the glass paints it.** The
+	effect shows the clip behind the glass across the whole output, so the
+	beam has to land on the clip's own edges -- which means the mask's square
+	pixels go out at the *output's* aspect, scaled by the face fit and the
+	deflection gain. The plugin works those two volts out from the tube and
+	the viewport and hands them to Update. Mapping the mask's corners to
+	+-1 V instead, as v0.1.12 did, squeezed a 16:9 clip into a square and
+	drew a round label as a tall ellipse in the middle of the glass.
 */
 class TraceSource : public Source
 {
 public:
-	static constexpr int kWidth  = 128;
-	static constexpr int kHeight = 72;
+	static constexpr int kWidth  = 512;
+	static constexpr int kHeight = 288;
 
 	void Prepare( double sampleRate ) override;
 	void Reset() override;
@@ -69,7 +84,22 @@ public:
 
 	/// Reduce the clip to an edge mask, start a readback, and extract strokes
 	/// from the readback issued last frame. Called once per frame, before Render.
-	void Update( GLuint clipTexture, float maxU, float maxV );
+	///
+	/// `voltsX` / `voltsY` are the deflection, in volts, at which the clip's
+	/// right and top edges sit on the glass: the strokes come out at those
+	/// volts so that the beam traces the clip where the glass shows it.
+	void Update( GLuint clipTexture, float maxU, float maxV, float voltsX, float voltsY );
+
+	/// The strokes the walker was last handed, in volts. For the harness.
+	const Strokes& Current() const
+	{
+		return strokes;
+	}
+
+	/// Extract strokes from a mask the caller supplies, bottom row first, as
+	/// the GPU pass would have produced it. For the harness: it drives the
+	/// whole CPU half -- threshold, thinning, walk, ordering -- with no GL.
+	void ExtractForTest( const unsigned char* mask, float voltsX, float voltsY );
 
 private:
 	void extract( const unsigned char* mask );
@@ -80,10 +110,16 @@ private:
 
 	ffglex::FFGLShader edgeShader;
 	ffglex::FFGLScreenQuad quad;
-	GLuint fbo         = 0;
-	GLuint maskTexture = 0;
+	//Two masks, ping-ponged: the pass reads last frame's as its history, and a
+	//texture cannot be sampled while it is the framebuffer being drawn into --
+	//that is a feedback loop, and GL leaves its result undefined.
+	GLuint fbo[ 2 ]         = { 0, 0 };
+	GLuint maskTexture[ 2 ] = { 0, 0 };
+	int maskIndex           = 0;
 	GLuint pbo[ 2 ]    = { 0, 0 };
 	int pboIndex       = 0;
+	float frameX       = 1.0f;
+	float frameY       = 1.0f;
 	bool pboPrimed     = false;
 	bool ready         = false;
 

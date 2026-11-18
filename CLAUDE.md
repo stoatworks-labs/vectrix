@@ -24,6 +24,7 @@ Disable with `-DBUILD_OFX=OFF`.
 - Brightness is independent of beam speed: `./build/vxtest --energy`
 - Density follows 1/v: `./build/vxtest --dwell`
 - Independent of sample count: `./build/vxtest --rate`
+- Trace lands on the clip, one closed stroke a loop: `./build/vxtest --trace`
 - No dead controls: `python3 tools/sweep.py`
 
 ## Notes
@@ -43,8 +44,8 @@ Disable with `-DBUILD_OFX=OFF`.
   response is a skew of the figure.
 - Every coefficient formula lives in `signal/fx/Filters.h` and nowhere else.
 - Phosphor decay constants are **measured**, in `render/Phosphor.cpp`.
-- `sample`, `input`, `output`, `filter`, `common`, `active` are GLSL reserved
-  words. Shader errors surface only at runtime, in the diagnostics log.
+- `sample`, `input`, `output`, `filter`, `common`, `active`, `half` are GLSL
+  reserved words. Shader errors surface only at runtime, in the diagnostics log.
 - `ScopedFBOBinding` restores the framebuffer and **not** the viewport; every
   `Scoped*` binding clears to 0 rather than restoring.
 - `SetParamInfo` clamps a STANDARD default into 0..1 before `SetParamRange` can

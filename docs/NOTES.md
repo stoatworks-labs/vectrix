@@ -174,6 +174,78 @@ created under the previous layout, and an instance carries the parameter surface
 it was born with. Restarting Arena does not clear it. Mount into a clip that has
 never held the plugin.
 
+## 2026-11-18: Trace drew a scribble on a title (plugin, not host)
+
+vjshow's Vol. 10 wanted Trace to walk a record label: a white disc, black
+STOATWORKS and VERSION on it, turning slowly. Through vjshow's offline host it
+drew a tall glowing ellipse in the middle of the glass and a zig-zag where each
+word was; with Delay on, squiggles. It was swapped out of the reel. **It was
+the first time Trace had been pointed at a picture at all** — no harness check
+covered it and Arena had never been asked to trace anything.
+
+**The host was cleared first.** v0.1.12 built from source renders bit-identical
+to the installed bundle in that host, and the host does nothing unusual: input
+`Width == HardwareWidth`, so MaxUV is 1; a fresh viewport per frame; `SetTime`
+advancing by a frame. The one-frame-late PBO readback is fine offline — mapping
+it simply waits. (A trap found on the way: vjshow virtualises the clock, so
+`steady_clock` stands still inside a frame and nothing can be *timed* in that
+host. Time things in vxtest.)
+
+**Three defects in the plugin, found by dumping the mask, the skeleton and the
+strokes:**
+
+1. **The strokes were not registered to the clip.** The mask's corners went out
+   at ±1 V on both axes. The effect paints the clip across the whole output, and
+   ±1 V is the graticule's box on the default round face, so a 16:9 clip was
+   squeezed to 0.44 of its width and 0.79 of its height (`deflectionGain` ×
+   H/W, and `deflectionGain`). The round label came out as an ellipse with a
+   0.56 aspect inside the disc it was traced from. That is the "tall stretched
+   ellipse", and it does not turn because a disc does not. Fix: the plugin works
+   out the volts at which the clip's edges sit on the glass —
+   `aspect / (faceFit × deflectionGain)` and `1 / (faceFit × deflectionGain)`
+   — and hands them to `Update`; the curvature path warps the clip and the
+   phosphor through the same bulge, so it holds there too.
+2. **128x72 could not resolve a letter.** VERSION's letters were 6–7 mask
+   pixels tall. Sobel merged each word into one band and the walk drew the
+   band's skeleton: the zig-zag. Now **512x288** — a mask texel at 1080p is
+   3.75 px, the default spot's FWHM (3.5 px), so the mask resolves about what
+   the beam can draw. The CPU half costs 2.5 ms on a busy mask on Apple silicon
+   (`vxtest --trace`); the readback is 144 KB. The clip is now box-filtered over
+   each mask texel rather than point-sampled, so thin line art cannot fall
+   between samples, and the taps step in the clip's coordinates (× MaxUV).
+3. **The walk cut clean loops into arcs.** A junction was "three or more
+   neighbours", which every staircase corner of a thinned line is, so the
+   junction pass started in the middle of curves; a loop never closed; and a
+   start mid-line gave two half-strokes. Now: junctions by the 0→1 transitions
+   round the ring, the walk extends backwards from its start, a loop that ends
+   next to its start is closed, and edge neighbours are tried before corners.
+   A disc's edge is one closed stroke.
+
+Also fixed in passing: the edge pass sampled its history from the texture it
+was drawing into, a feedback loop GL leaves undefined (now ping-ponged), and
+that history started as uninitialised memory.
+
+**Not bugs, but they read as "broken" on a title:**
+
+- **DC Block (on by default) moves a trace off its clip.** It is a 5 Hz
+  high-pass per axis; at the default 24 Hz refresh it rotates the figure's
+  fundamental about 11° against its harmonics and removes the figure's mean
+  position. On the label the traced disc sat ~10 px up-left of the real one at
+  960 wide. Correct for an AC-coupled amplifier — the guide now says to switch
+  it off for Trace. Whether Trace should default it off is Allan's call.
+- **P7 at Persistence 0.6 on a turning label is a smear.** Each frame's
+  contour stays lit for many frames as the label turns, and a static contour
+  redrawn every frame builds up into bloom. On P31 the trace is crisp — and,
+  at a 24 Hz refresh against 30 fps output, each frame shows only part of the
+  figure, which is also correct.
+- **With Delay on, a scribble is expected**: the delay mixes the beam's current
+  position with where it was, on a path that changes every refresh.
+
+`vxtest --trace` (in `--all`) now checks that a grey disc's trace peaks at the
+disc's own radius on all 24 rays (188.8 px for 189; v0.1.12 fails with the
+horizontal radius at 0.22 of it), that a ring comes back as one closed stroke at
+its own radius, and prints the extraction cost. **Still never run in Arena.**
+
 Related: [old cathode](https://github.com/stoatworks-labs/old-cathode/blob/main/docs/NOTES.md) (`old-cathode`) (raster CRT — the sibling this is deliberately
 not), [resolume scopes](https://github.com/stoatworks-labs/resolume-scopes/blob/main/docs/NOTES.md) (`resolume-scopes`) (measurement, not synthesis; `ScopeBuffer` and
 `SavedGLState` copied from it), [nib](https://github.com/stoatworks-labs/nib/blob/main/docs/NOTES.md) (`nib`) (edge detection as a *look*;
