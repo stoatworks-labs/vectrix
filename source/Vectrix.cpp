@@ -143,6 +143,15 @@ VectrixPlugin::VectrixPlugin( bool over ) : overInput( over )
 	for( const Default& d : kDefaults )
 		params[ d.id ] = d.value;
 
+	//DC Block starts OFF in Vectrix Trace, and only there. It is a 5 Hz high-pass
+	//on each deflection axis -- right for an oscillator, whose figure is meant to
+	//sit on its own average -- but a traced title is a still picture, and the
+	//filter drags each stroke toward the centre by a different amount as the
+	//beam walks them. In Arena an off-centre title came apart by up to ~80 px
+	//with it on, and sat within 2 px of its contour with it off.
+	if( overInput )
+		params[ PT_OUT_DC ] = 0.0f;
+
 	declareParameters();
 	applyVisibility( false );
 
@@ -381,7 +390,7 @@ void VectrixPlugin::declareParameters()
 	standard( this, PT_OUT_OFFSET_Y, "Offset Y" );
 	standard( this, PT_OUT_ROTATION, "Rotation" );
 	standard( this, PT_OUT_SKEW, "Skew" );
-	SetParamInfo( PT_OUT_DC, "DC Block", FF_TYPE_BOOLEAN, true );
+	SetParamInfo( PT_OUT_DC, "DC Block", FF_TYPE_BOOLEAN, params[ PT_OUT_DC ] > 0.5f );
 	standard( this, PT_OUT_SLEW, "Amp Slew" );
 	standard( this, PT_OUT_BANDWIDTH_X, "Bandwidth X" );
 	standard( this, PT_OUT_BANDWIDTH_Y, "Bandwidth Y" );

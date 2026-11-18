@@ -1819,9 +1819,36 @@ int checkTraceExtraction()
 	return failures;
 }
 
+/// Vectrix Trace starts with DC Block OFF and the generator with it ON. The
+/// high-pass is right for an oscillator and wrong for a still title: in Arena an
+/// off-centre title came apart by up to ~80 px with it on (docs/NOTES.md,
+/// 2026-11-18). The default is per build, so it is checked per build.
+int checkTraceDefaults()
+{
+	VectrixPlugin effect( true );
+	VectrixPlugin source( false );
+	const float effectDc = effect.GetFloatParameter( PT_OUT_DC );
+	const float sourceDc = source.GetFloatParameter( PT_OUT_DC );
+	std::printf( "  DC Block starts %s in Vectrix Trace, %s in Vectrix\n",
+	             effectDc > 0.5f ? "ON" : "off", sourceDc > 0.5f ? "on" : "OFF" );
+	int failures = 0;
+	if( effectDc > 0.5f )
+	{
+		std::printf( "  Vectrix Trace should start with DC Block off\n" );
+		++failures;
+	}
+	if( sourceDc < 0.5f )
+	{
+		std::printf( "  Vectrix should start with DC Block on\n" );
+		++failures;
+	}
+	return failures;
+}
+
 int checkTrace()
 {
-	int failures = checkTraceExtraction();
+	int failures = checkTraceDefaults();
+	failures += checkTraceExtraction();
 	failures += checkTraceRegistration();
 	std::printf( failures == 0 ? "trace: ok\n" : "trace: %d FAILED\n", failures );
 	return failures;

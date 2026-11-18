@@ -233,6 +233,13 @@ that history started as uninitialised memory.
   position. On the label the traced disc sat ~10 px up-left of the real one at
   960 wide. Correct for an AC-coupled amplifier — the guide now says to switch
   it off for Trace. Whether Trace should default it off is Allan's call.
+  **Settled the same day: Vectrix Trace defaults it off** (the FFGL effect and
+  the OpenFX Trace variant; the generator keeps it on). The label understated
+  it, being centred. In Arena 7.29.0 on this Mac, a white-on-black VERSION /
+  TEN title set above centre came apart with it on: each letter at its own
+  offset, median 19 px and up to ~80 px from its contour, the figure's centroid
+  80 px low. With it off, over twelve snapshots: median 2 px, 98% of the contour
+  covered, every letter. The browser demo keeps it on: it has no Trace Input.
 - **P7 at Persistence 0.6 on a turning label is a smear.** Each frame's
   contour stays lit for many frames as the label turns, and a static contour
   redrawn every frame builds up into bloom. On P31 the trace is crisp — and,

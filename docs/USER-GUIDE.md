@@ -120,9 +120,10 @@ down to the problem itself, and there isn't a setting that fixes it.
 The beam draws each edge where the glass shows it, so the figure sits on the clip behind it. Two
 settings decide how cleanly:
 
-- **Switch DC Block off** (Output). It models an AC-coupled amplifier, which centres any figure on
-  its own average position and bends its slowest component — correct for an oscillator, and enough
-  to pull a traced title visibly off the title.
+- **Leave DC Block off** (Output). Vectrix Trace starts with it off; the Vectrix generator starts
+  with it on. It models an AC-coupled amplifier, which centres any figure on its own average
+  position and bends its slowest component — correct for an oscillator, and enough to pull a traced
+  title apart, each letter by a different amount.
 - **Raise Max Strokes** for anything with more than a couple of words. Every letter is at least one
   stroke and its holes are more; past the limit the shortest strokes are dropped first.
 
@@ -236,7 +237,8 @@ P31 against P7 is up to a factor of three.
 
 **Trace on real footage is a scribble.** Expected. Use it on titles, logos and line art.
 
-**The trace sits a little off the title, or leans.** DC Block is on. Switch it off for Trace.
+**The trace sits off the title, leans, or comes apart.** DC Block is on. Vectrix Trace starts with
+it off from v0.1.13, so it has been switched on. Switch it off for Trace.
 
 **A traced title smears as it moves.** That is persistence: P7 and P39 keep each frame's contour
 lit for a long time. Use P31, or turn Persistence down.

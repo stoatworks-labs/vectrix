@@ -2284,7 +2284,9 @@ void describeParams( OFX::ImageEffectDescriptor& desc, bool overVariant )
 		case Kind::Toggle:
 		{
 			OFX::BooleanParamDescriptor* p = desc.defineBooleanParam( d.name );
-			p->setDefault( d.def > 0.5f );
+			//DC Block starts off in Vectrix Trace, as it does in the FFGL build;
+			//Vectrix.cpp says why. The table's default is the generator's.
+			p->setDefault( d.id == PT_OUT_DC && overVariant ? false : d.def > 0.5f );
 			param = p;
 			break;
 		}
@@ -2340,8 +2342,6 @@ void describeParams( OFX::ImageEffectDescriptor& desc, bool overVariant )
 			param->setParent( *group );
 		page->addChild( *param );
 	}
-
-	( void )overVariant;
 
 	// The Stoatworks About block: a read-only credit line and one push button
 	// per link, in a group that starts folded. Last, so it sits under the
